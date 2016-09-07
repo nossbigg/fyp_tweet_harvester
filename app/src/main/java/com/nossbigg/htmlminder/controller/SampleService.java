@@ -474,7 +474,7 @@ public class SampleService extends Service {
       initAppOAuth(OAuthTokenFilePath);
     }
 
-    return FileUtilsCustom.readfile(OAuthTokenFilePath);
+    return FileUtils.readFileToString(new File(OAuthTokenFilePath));
   }
 
   private void initAppOAuth(String path) {

@@ -2,8 +2,13 @@ package com.nossbigg.htmlminder.utils;
 
 import org.apache.commons.io.FileUtils;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Created by Gibson on 9/6/2016.
@@ -23,9 +28,5 @@ public class FileUtilsCustom {
     } else {
       FileUtils.write(file, content);
     }
-  }
-
-  public static String readfile(String path) throws IOException {
-    return FileUtils.readFileToString(new File(path));
   }
 }
