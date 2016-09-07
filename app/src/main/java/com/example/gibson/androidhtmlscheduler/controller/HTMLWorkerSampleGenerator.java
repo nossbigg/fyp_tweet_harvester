@@ -2,11 +2,11 @@ package com.example.gibson.androidhtmlscheduler.controller;
 
 import android.util.Log;
 
-import com.example.gibson.androidhtmlscheduler.model.AbstractHTMLWorker;
-import com.example.gibson.androidhtmlscheduler.model.HTMLSubWorker;
-import com.example.gibson.androidhtmlscheduler.model.HTMLWorkerJsonUtils;
-import com.example.gibson.androidhtmlscheduler.model.PlainHTMLWorker;
-import com.example.gibson.androidhtmlscheduler.model.TweetHTMLWorker;
+import com.example.gibson.androidhtmlscheduler.model.AbstractHTMLWorkerModel;
+import com.example.gibson.androidhtmlscheduler.model.HTMLSubWorkerModel;
+import com.example.gibson.androidhtmlscheduler.utils.HTMLWorkerModelUtils;
+import com.example.gibson.androidhtmlscheduler.model.PlainHTMLWorkerModel;
+import com.example.gibson.androidhtmlscheduler.model.TweetHTMLWorkerModel;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -21,30 +21,31 @@ import java.util.List;
  * Created by Gibson on 8/29/2016.
  */
 public class HTMLWorkerSampleGenerator {
-  public final String ROOT_DIR = HTMLWorkerService.ROOT_DIR;
+  // FIXME
+  public final String ROOT_DIR = "";
 
   public void generateSampleWorkers() {
     // Create Plain HTML Worker
-    PlainHTMLWorker plainHTMLWorker = new PlainHTMLWorker("Plain HTML Worker Sample");
-    plainHTMLWorker.subWorkers.add(new HTMLSubWorker("Subworker 1", "www.example.com", "GET", 0, 0));
-    plainHTMLWorker.subWorkers.add(new HTMLSubWorker("Subworker 2", "www.example.com", "GET", 0, 0));
-    HTMLSubWorker htmlSubWorker = new HTMLSubWorker("Subworker 3", "www.example.com", "GET", 0, 0);
+    PlainHTMLWorkerModel plainHTMLWorker = new PlainHTMLWorkerModel("Plain HTML Worker Sample");
+    plainHTMLWorker.subWorkers.add(new HTMLSubWorkerModel("Subworker 1", "www.example.com", "GET", 0, 0));
+    plainHTMLWorker.subWorkers.add(new HTMLSubWorkerModel("Subworker 2", "www.example.com", "GET", 0, 0));
+    HTMLSubWorkerModel htmlSubWorker = new HTMLSubWorkerModel("Subworker 3", "www.example.com", "GET", 0, 0);
     htmlSubWorker.parameters.put("q", "katy perry");
     plainHTMLWorker.subWorkers.add(htmlSubWorker);
 
     // Create Plain HTML Worker
-    PlainHTMLWorker plainHTMLWorker2 = new PlainHTMLWorker("Plain HTML Worker Sample (Batch)");
+    PlainHTMLWorkerModel plainHTMLWorker2 = new PlainHTMLWorkerModel("Plain HTML Worker Sample (Batch)");
     plainHTMLWorker2.isBatch = true;
-    plainHTMLWorker2.subWorkers.add(new HTMLSubWorker("Subworker 1", "www.example.com", "GET", 0, 0));
-    plainHTMLWorker2.subWorkers.add(new HTMLSubWorker("Subworker 2", "www.example.com", "GET", 0, 0));
+    plainHTMLWorker2.subWorkers.add(new HTMLSubWorkerModel("Subworker 1", "www.example.com", "GET", 0, 0));
+    plainHTMLWorker2.subWorkers.add(new HTMLSubWorkerModel("Subworker 2", "www.example.com", "GET", 0, 0));
 
     // Create Tweet HTML Worker
-    TweetHTMLWorker tweetHTMLWorker = new TweetHTMLWorker("CONSUMER_KEY", "CONSUMER_SECRET", "Tweet HTML Worker Sample");
-    plainHTMLWorker.subWorkers.add(new HTMLSubWorker("Subworker 1", "www.google.com", "GET", 0, 0));
-    plainHTMLWorker.subWorkers.add(new HTMLSubWorker("Subworker 2", "www.google.com", "GET", 0, 0));
+    TweetHTMLWorkerModel tweetHTMLWorker = new TweetHTMLWorkerModel("CONSUMER_KEY", "CONSUMER_SECRET", "Tweet HTML Worker Sample");
+    plainHTMLWorker.subWorkers.add(new HTMLSubWorkerModel("Subworker 1", "www.google.com", "GET", 0, 0));
+    plainHTMLWorker.subWorkers.add(new HTMLSubWorkerModel("Subworker 2", "www.google.com", "GET", 0, 0));
 
     // Save all HTML workers to file
-    List<AbstractHTMLWorker> abstractHTMLWorkerList = new ArrayList<>();
+    List<AbstractHTMLWorkerModel> abstractHTMLWorkerList = new ArrayList<>();
     abstractHTMLWorkerList.add(plainHTMLWorker);
     abstractHTMLWorkerList.add(plainHTMLWorker2);
     abstractHTMLWorkerList.add(tweetHTMLWorker);
@@ -52,9 +53,9 @@ public class HTMLWorkerSampleGenerator {
     // gson object
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-    for (AbstractHTMLWorker abstractHTMLWorker : abstractHTMLWorkerList) {
+    for (AbstractHTMLWorkerModel abstractHTMLWorker : abstractHTMLWorkerList) {
       // serialize worker
-      String json = HTMLWorkerJsonUtils.getHTMLWorkerSerialized(abstractHTMLWorker);
+      String json = HTMLWorkerModelUtils.HTMLWorkerModelToJson(abstractHTMLWorker);
 
       // write to file
       File file = new File(ROOT_DIR + "/" + abstractHTMLWorker.workerName + ".json");
@@ -77,7 +78,7 @@ public class HTMLWorkerSampleGenerator {
     );
 
     // import worker jsons
-    List<AbstractHTMLWorker> abstractHTMLWorkerList = new ArrayList<>();
+    List<AbstractHTMLWorkerModel> abstractHTMLWorkerList = new ArrayList<>();
     Gson gson = new Gson();
     for (File f : files) {
       // get file content
@@ -90,8 +91,8 @@ public class HTMLWorkerSampleGenerator {
       }
 
       // parse json to object
-      AbstractHTMLWorker abstractHTMLWorker =
-          HTMLWorkerJsonUtils.getHTMLWorkerDeserialized(json);
+      AbstractHTMLWorkerModel abstractHTMLWorker =
+          HTMLWorkerModelUtils.JsonToHTMLWorkerModel(json);
 
       // skips if parsing failed
       if (abstractHTMLWorker == null) continue;
@@ -101,10 +102,10 @@ public class HTMLWorkerSampleGenerator {
     }
 
     // iterate through all workers
-    for (AbstractHTMLWorker abstractHTMLWorker : abstractHTMLWorkerList) {
+    for (AbstractHTMLWorkerModel abstractHTMLWorker : abstractHTMLWorkerList) {
       Log.d("UNIQUE_TAG", abstractHTMLWorker.workerName);
-      if (abstractHTMLWorker instanceof TweetHTMLWorker) {
-        TweetHTMLWorker tweetHTMLWorker = (TweetHTMLWorker) abstractHTMLWorker;
+      if (abstractHTMLWorker instanceof TweetHTMLWorkerModel) {
+        TweetHTMLWorkerModel tweetHTMLWorker = (TweetHTMLWorkerModel) abstractHTMLWorker;
         Log.d("UNIQUE_TAG", tweetHTMLWorker.CONSUMER_KEY);
       }
     }

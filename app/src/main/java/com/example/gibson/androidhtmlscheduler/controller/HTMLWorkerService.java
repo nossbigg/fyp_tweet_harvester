@@ -1,17 +1,19 @@
 package com.example.gibson.androidhtmlscheduler.controller;
 
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Environment;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
-import com.example.gibson.androidhtmlscheduler.model.AbstractHTMLWorker;
-import com.example.gibson.androidhtmlscheduler.model.HTMLWorkerJsonUtils;
-import com.example.gibson.androidhtmlscheduler.model.HTMLWorkerType;
-import com.example.gibson.androidhtmlscheduler.model.TweetHTMLWorker;
+import com.example.gibson.androidhtmlscheduler.model.AbstractHTMLWorkerModel;
+import com.example.gibson.androidhtmlscheduler.utils.HTMLWorkerModelUtils;
+import com.example.gibson.androidhtmlscheduler.model.PlainHTMLWorkerModel;
+import com.example.gibson.androidhtmlscheduler.model.TweetHTMLWorkerModel;
+import com.example.gibson.androidhtmlscheduler.utils.HTMLWorkerUtils;
 import com.google.gson.Gson;
 
 import org.apache.commons.io.FileUtils;
@@ -19,6 +21,7 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -26,7 +29,20 @@ import java.util.List;
  */
 public class HTMLWorkerService extends Service {
   // Constants
-  public static final String ROOT_DIR = initializeRootDirectoryVariable();
+  private PowerManager.WakeLock wakeLock;
+
+  // Variables
+  public HashMap<String, AbstractHTMLWorker> HTMLWorkersHashMap = new HashMap<>();
+  public String appDirectory;
+
+  @Override
+  public void onCreate() {
+    super.onCreate();
+
+    // set wakelock
+    PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DoNjfdhotDimScreen");
+  }
 
   @Nullable
   @Override
@@ -36,6 +52,19 @@ public class HTMLWorkerService extends Service {
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startid) {
+    // set root directory
+    this.appDirectory = intent.getStringExtra("appDirectory");
+
+    // create directory (if does not exist)
+    File appDirectoryFile = new File(appDirectory);
+    if(!appDirectoryFile.exists()){
+      try {
+        FileUtils.forceMkdir(appDirectoryFile);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+
     init();
 
     return 0;
@@ -43,15 +72,18 @@ public class HTMLWorkerService extends Service {
 
   public void init() {
     // Get all config files
-    List<AbstractHTMLWorker> abstractHTMLWorkerList = getWorkers(ROOT_DIR);
+    List<AbstractHTMLWorkerModel> abstractHTMLWorkerModelList = getWorkerModels(appDirectory);
 
     // start services accordingly
-    for (AbstractHTMLWorker abstractHTMLWorker : abstractHTMLWorkerList) {
-      startWorker(abstractHTMLWorker);
+    for (AbstractHTMLWorkerModel abstractHTMLWorkerModel : abstractHTMLWorkerModelList) {
+      startWorker(abstractHTMLWorkerModel);
     }
+
+    // make worker json files neat
+    HTMLWorkerModelUtils.MakeAllJsonWorkerModelsPretty(appDirectory);
   }
 
-  public List<AbstractHTMLWorker> getWorkers(String rootDirectory) {
+  public List<AbstractHTMLWorkerModel> getWorkerModels(String rootDirectory) {
     // match only .json files
     List<String> listFileMatcher = new ArrayList<>();
     listFileMatcher.add("json");
@@ -62,7 +94,7 @@ public class HTMLWorkerService extends Service {
     );
 
     // import worker jsons
-    List<AbstractHTMLWorker> abstractHTMLWorkerList = new ArrayList<>();
+    List<AbstractHTMLWorkerModel> htmlWorkerModelArrayList = new ArrayList<>();
     Gson gson = new Gson();
     for (File f : files) {
       // get file content
@@ -75,69 +107,54 @@ public class HTMLWorkerService extends Service {
       }
 
       // parse json to object
-      AbstractHTMLWorker abstractHTMLWorker =
-          HTMLWorkerJsonUtils.getHTMLWorkerDeserialized(json);
+      AbstractHTMLWorkerModel abstractHTMLWorkerModel =
+          HTMLWorkerModelUtils.JsonToHTMLWorkerModel(json);
 
       // skips if parsing failed
-      if (abstractHTMLWorker == null) continue;
+      if (abstractHTMLWorkerModel == null) continue;
 
       // adds worker to list
-      abstractHTMLWorkerList.add(abstractHTMLWorker);
-    }
-
-    // iterate through all workers
-    for (AbstractHTMLWorker abstractHTMLWorker : abstractHTMLWorkerList) {
-      Log.d("UNIQUE_TAG", abstractHTMLWorker.workerName);
-      if (abstractHTMLWorker instanceof TweetHTMLWorker) {
-        TweetHTMLWorker tweetHTMLWorker = (TweetHTMLWorker) abstractHTMLWorker;
-        Log.d("UNIQUE_TAG", tweetHTMLWorker.CONSUMER_KEY);
-      }
+      htmlWorkerModelArrayList.add(abstractHTMLWorkerModel);
     }
 
     // return list of workers
-    return abstractHTMLWorkerList;
+    return htmlWorkerModelArrayList;
   }
 
-  //TODO implement isBatch functionality
-  public void startWorker(final AbstractHTMLWorker abstractHTMLWorker) {
-    new AsyncTask<Void, Void, Void>() {
-      @Override
-      protected Void doInBackground(Void... params) {
+  public void startWorker(final AbstractHTMLWorkerModel abstractHTMLWorkerModel) {
+    Log.d("UNIQUE_TAG", abstractHTMLWorkerModel.workerName);
 
-        if (abstractHTMLWorker.htmlWorkerType == HTMLWorkerType.PLAIN) {
-
-        } else if (abstractHTMLWorker.htmlWorkerType == HTMLWorkerType.TWEET) {
-
-        }
-
-
-        return null;
+    // create worker object, add to hashmap
+    switch (abstractHTMLWorkerModel.htmlWorkerType) {
+      case PLAIN: {
+        HTMLWorkersHashMap.put(
+            abstractHTMLWorkerModel.workerName,
+            new PlainHTMLWorker((PlainHTMLWorkerModel) abstractHTMLWorkerModel,
+                appDirectory));
+        break;
       }
-    }.execute();
-  }
-
-  public void startSubWorker() {
-    //pull data from endpoint
-
-  }
-
-  private Runnable subWorkerRunnable = new Runnable(){
-    @Override
-    public void run() {
-      // do request
-
-
-      // save
+      case TWEET: {
+        HTMLWorkersHashMap.put(
+            abstractHTMLWorkerModel.workerName,
+            new TweetHTMLWorker((TweetHTMLWorkerModel) abstractHTMLWorkerModel,
+                appDirectory));
+        break;
+      }
+      default: {
+        // unknown type
+        return;
+      }
     }
-  };
+
+    // start worker
+    AbstractHTMLWorker abstractHTMLWorker = HTMLWorkersHashMap.get(abstractHTMLWorkerModel.workerName);
+    abstractHTMLWorker.startWorker();
+  }
 
   /**
    * Returns the appropriate storage directory path
    *
    * @return
    */
-  private static String initializeRootDirectoryVariable() {
-    return Environment.getExternalStorageDirectory().getAbsolutePath()
-        + "/HTMLMinder/";
-  }
+
 }

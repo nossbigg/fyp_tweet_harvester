@@ -15,10 +15,9 @@ import android.util.Base64;
 import android.util.Log;
 
 import com.example.gibson.androidhtmlscheduler.R;
+import com.example.gibson.androidhtmlscheduler.utils.FileUtilsCustom;
 import com.example.gibson.androidhtmlscheduler.view.MainActivity;
-import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
-import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
 
 import org.apache.commons.codec.digest.HmacUtils;
@@ -52,7 +51,8 @@ import javax.net.ssl.HttpsURLConnection;
  * Created by Gibson on 8/12/2016.
  */
 public class SampleService extends Service {
-  private final String ROOT_DIR = HTMLWorkerService.ROOT_DIR;
+  // FIXME
+  private final String ROOT_DIR = "";
   private boolean isInitialized = false;
   private PowerManager.WakeLock wakeLock;
 
@@ -71,6 +71,7 @@ public class SampleService extends Service {
   }
 
   private long tweet_last_max_id = 0L;
+
   @Override
   public int onStartCommand(Intent intent, int flags, int startid) {
     String key = intent.getStringExtra("key");
@@ -165,8 +166,8 @@ public class SampleService extends Service {
               return null;
             }
             // don't save if no new tweets
-            if(tweetsReceived==0) {
-              Log.d("UNIQUE_TAG","no new tweets");
+            if (tweetsReceived == 0) {
+              Log.d("UNIQUE_TAG", "no new tweets");
               return null;
             }
 
@@ -234,15 +235,15 @@ public class SampleService extends Service {
     // url encode q
     String q_urlencoded = "";
     try {
-      q_urlencoded = "?q=" + URLEncoder.encode(q_term,"UTF-8");
+      q_urlencoded = "?q=" + URLEncoder.encode(q_term, "UTF-8");
     } catch (UnsupportedEncodingException e) {
       e.printStackTrace();
       return null;
     }
 
     // add tweet max limiter (if available)
-    if(tweet_last_max_id!=0L){
-      q_urlencoded += "&since_id="+tweet_last_max_id;
+    if (tweet_last_max_id != 0L) {
+      q_urlencoded += "&since_id=" + tweet_last_max_id;
     }
 
     String tweetEndpoint = "https://api.twitter.com/1.1/search/tweets.json";
@@ -473,7 +474,7 @@ public class SampleService extends Service {
       initAppOAuth(OAuthTokenFilePath);
     }
 
-    return readfile(OAuthTokenFilePath);
+    return FileUtilsCustom.readfile(OAuthTokenFilePath);
   }
 
   private void initAppOAuth(String path) {
@@ -536,43 +537,10 @@ public class SampleService extends Service {
     if (!Strings.isNullOrEmpty(bearerToken)) {
       Log.d("UNIQUE_TAG", bearerToken);
       try {
-        saveToFile(path, bearerToken);
+        FileUtilsCustom.saveToFile(path, bearerToken, false);
       } catch (Exception e) {
       }
     }
 
   }
-
-  /**
-   * Appends to file
-   *
-   * @param path
-   * @param content
-   */
-  private void saveToFile(String path, String content) throws IOException {
-    File file = new File(path);
-
-    // create file if doesn't exist
-    if (!file.exists()) {
-      // file does not exist
-      Files.write(content, file, Charsets.UTF_8);
-    } else {
-      // file exists
-      String existingContent = readfile(path);
-      existingContent += content;
-
-      Files.write(existingContent, file, Charsets.UTF_8);
-    }
-  }
-
-  private String readfile(String path) throws IOException {
-    File file = new File(path);
-    String existingContent = "";
-    for (String line : Files.readLines(file, Charsets.UTF_8)) {
-      existingContent += line;
-    }
-    return existingContent;
-  }
-
-
 }
