@@ -15,9 +15,9 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import com.nossbigg.htmlminder.R;
-import com.nossbigg.htmlminder.controller.HTMLWorkerSampleGenerator;
+import com.nossbigg.htmlminder.utils.HTMLWorkerSampleGenerator;
 import com.nossbigg.htmlminder.controller.HTMLWorkerService;
-import com.nossbigg.htmlminder.controller.SampleService;
+import com.nossbigg.htmlminder.todelete.SampleService;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;

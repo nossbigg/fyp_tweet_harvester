@@ -25,10 +25,10 @@
 
         <!--Services-->
         <service
-            android:name="com.nossbigg.htmlminder.controller.SampleIntentService"
+            android:name=".todelete.SampleIntentService"
             android:exported="false"/>
         <service
-            android:name="com.nossbigg.htmlminder.controller.SampleService"
+            android:name=".todelete.SampleService"
             android:exported="false"/>
         <service
             android:name="com.nossbigg.htmlminder.controller.HTMLWorkerService"
