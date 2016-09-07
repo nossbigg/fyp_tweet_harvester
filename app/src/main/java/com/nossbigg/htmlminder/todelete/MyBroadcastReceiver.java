@@ -1,4 +1,4 @@
-package com.nossbigg.htmlminder.controller;
+package com.nossbigg.htmlminder.todelete;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

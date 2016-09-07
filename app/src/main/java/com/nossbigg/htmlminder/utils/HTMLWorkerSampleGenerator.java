@@ -1,4 +1,4 @@
-package com.nossbigg.htmlminder.controller;
+package com.nossbigg.htmlminder.utils;
 
 import android.util.Log;
 
