@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/HTMLMinder.iml" filepath="$PROJECT_DIR$/HTMLMinder.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/nossbigg-htmlminder.iml" filepath="$PROJECT_DIR$/nossbigg-htmlminder.iml" />
     </modules>
   </component>
 </project>
