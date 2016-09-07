@@ -5,7 +5,7 @@ android {
     buildToolsVersion "24.0.0"
 
     defaultConfig {
-        applicationId "com.example.gibson.androidhtmlscheduler"
+        applicationId "com.nossbigg.htmlminder"
         minSdkVersion 14
         targetSdkVersion 23
         versionCode 1
