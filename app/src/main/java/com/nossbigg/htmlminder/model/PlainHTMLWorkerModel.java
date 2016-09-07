@@ -11,5 +11,4 @@ public class PlainHTMLWorkerModel extends AbstractHTMLWorkerModel {
   public PlainHTMLWorkerModel(PlainHTMLWorkerModel p) {
     super(p);
   }
-
 }
