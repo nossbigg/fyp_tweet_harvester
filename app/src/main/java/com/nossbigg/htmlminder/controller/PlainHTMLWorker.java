@@ -120,7 +120,7 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
           String subWorkerDirectory = workerDirectory + htmlSubWorkerModel.subWorkerName + "/";
           String fullPath = subWorkerDirectory +
               htmlSubWorkerModel.subWorkerName + "-" +
-              getCurrentDateInFormat("yyyy-MM-dd") + ".text";
+              HTMLWorkerUtils.getCurrentDateInFormat("yyyy-MM-dd") + ".text";
 
           // save response
           FileUtilsCustom.saveToFile(fullPath, response, true);
@@ -200,12 +200,5 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
     }
 
     return response;
-  }
-
-  private String getCurrentDateInFormat(String format) {
-    SimpleDateFormat sdfDate = new SimpleDateFormat(format);//dd/MM/yyyy
-    Date now = new Date();
-    String strDate = sdfDate.format(now);
-    return strDate;
   }
 }

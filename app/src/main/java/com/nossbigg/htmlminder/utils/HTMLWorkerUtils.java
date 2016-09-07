@@ -7,10 +7,14 @@ import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
+
+import javax.net.ssl.HttpsURLConnection;
 
 /**
  * Created by Gibson on 8/30/2016.
@@ -85,7 +89,7 @@ public class HTMLWorkerUtils {
 
       ArrayList<String> terms = new ArrayList<>(Arrays.asList(field.split("\\.")));
       int size = terms.size();
-      int indexLastElement = size-1;
+      int indexLastElement = size - 1;
       for (int index = 0; index < size; index++) {
         String term = terms.get(index);
         //boolean isArrayAccessor = term.matches("^(?:[\\w]+)((\\[[\\d]+\\])+)$");
@@ -121,7 +125,7 @@ public class HTMLWorkerUtils {
     return true;
   }
 
-  public static boolean isJsonObject(String jsonString){
+  public static boolean isJsonObject(String jsonString) {
     try {
       JSONObject jo = new JSONObject(jsonString);
     } catch (JSONException e) {
@@ -130,9 +134,14 @@ public class HTMLWorkerUtils {
     return true;
   }
 
+  public static String getCurrentDateInFormat(String format) {
+    SimpleDateFormat sdfDate = new SimpleDateFormat(format);
+    Date now = new Date();
+    return sdfDate.format(now);
+  }
 
   // TODO design method to return basic connection
-//  public static HttpsURLConnection prepareBasicConnection(){
+//  public static HttpsURLConnection prepareBasicConnection() {
 //
 //  }
 }
