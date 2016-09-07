@@ -92,7 +92,6 @@ public class HTMLWorkerModelUtils {
     return JsonToHTMLWorkerModel(json, false);
   }
 
-  // TODO automatically add empty fields
   public static void MakeAllJsonWorkerModelsPretty(String rootDirectory) {
     // match only .json files
     List<String> listFileMatcher = new ArrayList<>();
