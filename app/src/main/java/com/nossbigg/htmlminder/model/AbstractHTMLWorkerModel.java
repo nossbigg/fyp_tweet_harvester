@@ -12,6 +12,11 @@ public abstract class AbstractHTMLWorkerModel {
   public List<HTMLSubWorkerModel> subWorkers = new ArrayList<>();
   public String description = "";
 
+  // paths to file and data save dir
+  // for runtime only, will not be persisted
+  public transient String jsonConfigFilePath = "";
+  public transient String dataSaveDir = "";
+
   // determines if tasks are to be done sequentially + batch
   public boolean isBatch;
 
