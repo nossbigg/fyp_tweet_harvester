@@ -13,8 +13,12 @@ public class HTMLSubWorkerModel {
   public String method = "";
   public long interval = 0;
   public long intervalRandomVariance = 0;
-  public Map<String, String> parameters = new HashMap<>();
+  public HashMap<String, String> parameters = new HashMap<>();
   public String checkFieldsNotEmpty = "";
+
+  // paths data save dir
+  // for runtime only, will not be persisted
+  public transient String dataSaveDir = "";
 
   public HTMLSubWorkerModel(String subWorkerName, String url, String method, long interval, long intervalRandomVariance) {
     this.subWorkerName = subWorkerName;
