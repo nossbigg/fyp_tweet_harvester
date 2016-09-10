@@ -21,14 +21,14 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    testCompile 'junit:junit:4.12'
+    // Android AppCompat libraries: Enhanced user interface patterns
     compile 'com.android.support:appcompat-v7:23.4.0'
-    compile 'com.android.volley:volley:1.0.0'
-    compile group: 'com.google.guava', name: 'guava', version: '15.0'
+    // JUnit: testing framework
+    testCompile 'junit:junit:4.12'
+    // Gson: JSON serializer/deserializer
     compile 'com.google.code.gson:gson:2.7'
+    // Apache Commons IO: FileUtils
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
+    // Apache Commons Lang3: StringUtils
     compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.0'
-    compile group: 'commons-codec', name: 'commons-codec', version: '1.10'
-    compile 'com.dropbox.core:dropbox-core-sdk:2.1.1'
-//    compile group: 'commons-beanutils', name: 'commons-beanutils', version: '1.9.2'
 }
