@@ -1,17 +1,33 @@
 package com.nossbigg.htmlminder.utils;
 
+import android.os.AsyncTask;
+
+import com.google.gson.Gson;
+import com.nossbigg.htmlminder.controller.AsyncCallbackHandler;
+import com.nossbigg.htmlminder.controller.TweetHTMLWorker;
+import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
+import com.nossbigg.htmlminder.model.TweetHTMLWorkerModel;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ListIterator;
 import java.util.Map;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -125,23 +141,108 @@ public class HTMLWorkerUtils {
     return true;
   }
 
-  public static boolean isJsonObject(String jsonString) {
-    try {
-      JSONObject jo = new JSONObject(jsonString);
-    } catch (JSONException e) {
-      return false;
-    }
-    return true;
-  }
-
   public static String getCurrentDateInFormat(String format) {
     SimpleDateFormat sdfDate = new SimpleDateFormat(format);
     Date now = new Date();
     return sdfDate.format(now);
   }
 
-  // TODO design method to return basic connection
-//  public static HttpsURLConnection prepareBasicConnection() {
-//
-//  }
+  public static HttpsURLConnection prepareBasicConnection(HTMLSubWorkerModel htmlSubWorkerModel) throws IOException {
+    // parses params if GET
+    String urlString = htmlSubWorkerModel.url;
+    if (StringUtils.equals("GET", htmlSubWorkerModel.method)) {
+      urlString = HTMLWorkerUtils.AddParamsToURL(urlString, htmlSubWorkerModel.parameters);
+    }
+
+    // build url object
+    URL url = new URL(urlString);
+
+    // build url connection object
+    HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
+    con.setRequestMethod(htmlSubWorkerModel.method);
+
+    // if POST, send params
+    if (StringUtils.equals("POST", htmlSubWorkerModel.method)) {
+      // set form urlencoded
+      con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
+
+      // enable output stream
+      con.setDoOutput(true);
+
+      // open connection
+      BufferedWriter wr = new BufferedWriter(new OutputStreamWriter(con.getOutputStream()));
+
+      // send params
+      for (Map.Entry<String, String> entry : htmlSubWorkerModel.parameters.entrySet()) {
+        wr.write(URLEncoder.encode(entry.getKey(), "UTF-8")
+            + "="
+            + URLEncoder.encode(entry.getValue(), "UTF-8")
+        );
+      }
+
+      // close connection
+      wr.flush();
+      wr.close();
+    }
+
+    return con;
+  }
+
+  // TWITTER WORKERS
+  // OAUTH
+  public static void initTwitterOAuth(final TweetHTMLWorker tweetHTMLWorker
+      , final TweetHTMLWorkerModel workerModel) throws IOException, JSONException {
+    if (!StringUtils.isEmpty(workerModel.OAUTH_TOKEN)) {
+      tweetHTMLWorker.callbackOAuthRequest(true);
+      return;
+    }
+
+    new AsyncTask<TweetHTMLWorkerModel, Void, Boolean>() {
+      @Override
+      protected Boolean doInBackground(TweetHTMLWorkerModel... params) {
+        String OAUTH_TOKEN = "";
+        try {
+          OAUTH_TOKEN = TwitterAPIUtils.getOAuthBearerToken(workerModel.CONSUMER_KEY, workerModel.CONSUMER_SECRET);
+          workerModel.OAUTH_TOKEN = OAUTH_TOKEN;
+        } catch (Exception e) {
+          e.printStackTrace();
+          return false;
+        }
+        return true;
+      }
+
+      @Override
+      protected void onPostExecute(Boolean result) {
+        tweetHTMLWorker.callbackOAuthRequest(result);
+      }
+    }.execute(workerModel);
+  }
+
+  public static HashMap<String, Long> getWorkerNameToLastMaxIdTweetJson(String path) {
+    // build new empty list
+    HashMap<String, Long> newList = new HashMap<>();
+
+    // if file doesn't exist, just build new empty list based off worker names
+    File file = new File(path);
+    if (!file.exists()) {
+      return newList;
+    }
+
+    // read file content
+    String json = "";
+    try {
+      json = FileUtils.readFileToString(file);
+    } catch (IOException e) {
+      // failed to read file
+      return newList;
+    }
+
+    // deserialize map
+    Gson gson = new Gson();
+    HashMap<String, Long> importedList =
+        gson.fromJson(json, newList.getClass());
+
+    // return entries
+    return newList;
+  }
 }
