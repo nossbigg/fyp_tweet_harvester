@@ -9,16 +9,16 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.nossbigg.htmlminder.model.AbstractHTMLWorkerModel;
-import com.nossbigg.htmlminder.utils.HTMLWorkerModelUtils;
+import com.nossbigg.htmlminder.model.ActivityBagModel;
+import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
 import com.nossbigg.htmlminder.model.PlainHTMLWorkerModel;
 import com.nossbigg.htmlminder.model.TweetHTMLWorkerModel;
-import com.google.gson.Gson;
+import com.nossbigg.htmlminder.utils.HTMLWorkerModelUtils;
 
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -31,7 +31,8 @@ public class HTMLWorkerService extends Service {
 
   // Variables
   public HashMap<String, AbstractHTMLWorker> HTMLWorkersHashMap = new HashMap<>();
-  public String appDirectory;
+  public String appDirectory = "";
+  public ActivityBagModel activityBagModel;
 
   @Override
   public void onCreate() {
@@ -50,12 +51,15 @@ public class HTMLWorkerService extends Service {
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startid) {
-    // set root directory
-    this.appDirectory = intent.getStringExtra("appDirectory");
+    // load reference to activityBagModel
+    activityBagModel = (ActivityBagModel) intent.getSerializableExtra("activityBagModel");
+
+    // load appDirectory
+    appDirectory = activityBagModel.localFileService.appDir;
 
     // create directory (if does not exist)
     File appDirectoryFile = new File(appDirectory);
-    if(!appDirectoryFile.exists()){
+    if (!appDirectoryFile.exists()) {
       try {
         FileUtils.forceMkdir(appDirectoryFile);
       } catch (IOException e) {
@@ -65,58 +69,22 @@ public class HTMLWorkerService extends Service {
 
     init();
 
-    return 0;
+    return START_STICKY;
   }
 
   public void init() {
-    // Get all config files
-    List<AbstractHTMLWorkerModel> abstractHTMLWorkerModelList = getWorkerModels(appDirectory);
+    // Get all worker objects from json files
+    List<AbstractHTMLWorkerModel> abstractHTMLWorkerModelList
+        = getWorkerModels(appDirectory);
 
     // start services accordingly
     for (AbstractHTMLWorkerModel abstractHTMLWorkerModel : abstractHTMLWorkerModelList) {
       startWorker(abstractHTMLWorkerModel);
     }
 
-    // make worker json files neat
-    HTMLWorkerModelUtils.MakeAllJsonWorkerModelsPretty(appDirectory);
-  }
-
-  public List<AbstractHTMLWorkerModel> getWorkerModels(String rootDirectory) {
-    // match only .json files
-    List<String> listFileMatcher = new ArrayList<>();
-    listFileMatcher.add("json");
-
-    // get paths of all workers
-    List<File> files = (List<File>) FileUtils.listFiles(
-        new File(rootDirectory), listFileMatcher.toArray(new String[0]), true
-    );
-
-    // import worker jsons
-    List<AbstractHTMLWorkerModel> htmlWorkerModelArrayList = new ArrayList<>();
-    Gson gson = new Gson();
-    for (File f : files) {
-      // get file content
-      String json = "";
-      try {
-        json = FileUtils.readFileToString(f);
-      } catch (IOException e) {
-        e.printStackTrace();
-        continue;
-      }
-
-      // parse json to object
-      AbstractHTMLWorkerModel abstractHTMLWorkerModel =
-          HTMLWorkerModelUtils.JsonToHTMLWorkerModel(json);
-
-      // skips if parsing failed
-      if (abstractHTMLWorkerModel == null) continue;
-
-      // adds worker to list
-      htmlWorkerModelArrayList.add(abstractHTMLWorkerModel);
-    }
-
-    // return list of workers
-    return htmlWorkerModelArrayList;
+    // make worker json files neat + repair
+    HTMLWorkerModelUtils.MakeAllJsonWorkerModelsPretty(
+        activityBagModel.localFileService.getWorkerConfigsDir());
   }
 
   public void startWorker(final AbstractHTMLWorkerModel abstractHTMLWorkerModel) {
@@ -127,15 +95,13 @@ public class HTMLWorkerService extends Service {
       case PLAIN: {
         HTMLWorkersHashMap.put(
             abstractHTMLWorkerModel.workerName,
-            new PlainHTMLWorker((PlainHTMLWorkerModel) abstractHTMLWorkerModel,
-                appDirectory));
+            new PlainHTMLWorker((PlainHTMLWorkerModel) abstractHTMLWorkerModel));
         break;
       }
       case TWEET: {
         HTMLWorkersHashMap.put(
             abstractHTMLWorkerModel.workerName,
-            new TweetHTMLWorker((TweetHTMLWorkerModel) abstractHTMLWorkerModel,
-                appDirectory));
+            new TweetHTMLWorker((TweetHTMLWorkerModel) abstractHTMLWorkerModel));
         break;
       }
       default: {
@@ -149,10 +115,29 @@ public class HTMLWorkerService extends Service {
     abstractHTMLWorker.startWorker();
   }
 
-  /**
-   * Returns the appropriate storage directory path
-   *
-   * @return
-   */
+  public List<AbstractHTMLWorkerModel> getWorkerModels(String appDirectory) {
+    String workersDirectory = activityBagModel.localFileService.getWorkerConfigsDir();
+    ;
+
+    List<AbstractHTMLWorkerModel> workerModels = HTMLWorkerModelUtils.getWorkerModelsFromDirectory(workersDirectory);
+
+    // ADDITIONAL VARIABLES
+    // saves data save directories to each worker and subworker
+    for (AbstractHTMLWorkerModel abstractHTMLWorkerModel : workerModels) {
+      // saves worker data save dir
+      abstractHTMLWorkerModel.dataSaveDir =
+          activityBagModel.localFileService.getWorkerDataSaveDir(abstractHTMLWorkerModel);
+
+      // save subworkers data save directories
+      for (HTMLSubWorkerModel htmlSubWorkerModel : abstractHTMLWorkerModel.subWorkers) {
+        htmlSubWorkerModel.dataSaveDir =
+            activityBagModel.localFileService.getSubWorkerDataSaveDir(
+                abstractHTMLWorkerModel, htmlSubWorkerModel);
+      }
+    }
+
+    // return list of workers
+    return workerModels;
+  }
 
 }

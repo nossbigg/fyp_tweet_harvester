@@ -10,19 +10,17 @@ import java.util.HashMap;
  */
 public abstract class AbstractHTMLWorker {
   public AbstractHTMLWorkerModel abstractHTMLWorkerModel;
-  public Runnable masterWorker;
   public HashMap<String, HTMLSubWorker> namesToWorkersMap = new HashMap<>();
   public int notificationID;
-  public String workerDirectory = "";
 
-  public AbstractHTMLWorker(AbstractHTMLWorkerModel abstractHTMLWorkerModel,
-                            String appDirectory) {
+  public AbstractHTMLWorker(AbstractHTMLWorkerModel abstractHTMLWorkerModel) {
     this.abstractHTMLWorkerModel = abstractHTMLWorkerModel;
     notificationID = HTMLWorkerUtils.WorkerNameToNotificationID(abstractHTMLWorkerModel.workerName);
-    workerDirectory = appDirectory + abstractHTMLWorkerModel.workerName + "/";
   }
 
   public abstract void startWorker();
 
   public abstract void stopWorker();
+
+  // TODO implement notification builder
 }

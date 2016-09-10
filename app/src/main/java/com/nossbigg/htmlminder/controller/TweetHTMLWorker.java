@@ -1,104 +1,326 @@
 package com.nossbigg.htmlminder.controller;
 
+import android.os.AsyncTask;
+import android.os.Handler;
+import android.util.Log;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.nossbigg.htmlminder.exception.HTMLWorkerCallFailedException;
+import com.nossbigg.htmlminder.exception.HTMLWorkerException;
+import com.nossbigg.htmlminder.exception.HTMLWorkerNotOKException;
+import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
+import com.nossbigg.htmlminder.model.JSONResponseMetadataModel;
 import com.nossbigg.htmlminder.model.TweetHTMLWorkerModel;
+import com.nossbigg.htmlminder.utils.FileUtilsCustom;
+import com.nossbigg.htmlminder.utils.GsonUtils;
+import com.nossbigg.htmlminder.utils.HTMLWorkerModelUtils;
+import com.nossbigg.htmlminder.utils.HTMLWorkerUtils;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.zip.GZIPInputStream;
+
+import javax.net.ssl.HttpsURLConnection;
 
 /**
+ * Tweet HTML Worker
+ * Note: Tweets are collected sequentially by worker order, and not in parallel.
+ * <p/>
  * Created by Gibson on 9/6/2016.
  */
-public class TweetHTMLWorker extends AbstractHTMLWorker {
+public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallbackHandler {
   public TweetHTMLWorkerModel workerModel;
 
-  public TweetHTMLWorker(TweetHTMLWorkerModel tweetHTMLWorkerModel, String appDirectory) {
-    super(tweetHTMLWorkerModel, appDirectory);
+  public Boolean isProperConfig = true;
+
+  public long requestInterval = 0;
+  public long requestIntervalRandomVariance = 0;
+
+  // LAST TWEET ID Persistence
+  // stores last max id to each worker
+  public HashMap<String, Long> workerNameToLastMaxIdTweetMap = new HashMap<>();
+  // Handler and runnable for persistence
+  public Handler lastTweetIdPersistenceHandler = new Handler();
+  public Runnable lastTweetIdPersistenceRunnable;
+  public long lastTweetIdPersistenceInterval = 5000;
+
+  // LOOPING THREAD VARIABLES
+  private int subWorkerIteratorCurrentIndex = 0;
+  private int subWorkerSize = 0;
+
+  // Handler and runnable for master loop
+  public Handler masterWorkerHandler = new Handler();
+  public Runnable masterWorkerRunnable;
+
+  public TweetHTMLWorker(TweetHTMLWorkerModel tweetHTMLWorkerModel) {
+    super(tweetHTMLWorkerModel);
     workerModel = tweetHTMLWorkerModel;
+    masterWorkerRunnable = initMasterWorkerRunnable(masterWorkerHandler, workerModel);
+    initWorkers();
+
+    lastTweetIdPersistenceRunnable = initLastTweetIdPersistenceRunnable(
+        lastTweetIdPersistenceHandler, workerNameToLastMaxIdTweetMap,
+        LocalFileService.getLastMaxTweetJsonPathFromWorkerDataSaveDir(workerModel.dataSaveDir)
+    );
   }
 
   @Override
   public void startWorker() {
+    // try load oauth
+    try {
+      HTMLWorkerUtils.initTwitterOAuth(this, workerModel);
+    } catch (Exception e) {
+      isProperConfig = false;
+    }
+  }
 
+  public void startWorkerAfterCallback() {
+    if (!isProperConfig) return;
+
+    // reset iterator if not at first element
+    subWorkerIteratorCurrentIndex = 0;
+
+    // start worker
+    masterWorkerHandler.post(masterWorkerRunnable);
+
+    // start last tweet id map persistence
+    lastTweetIdPersistenceHandler.post(lastTweetIdPersistenceRunnable);
   }
 
   @Override
   public void stopWorker() {
-
+    masterWorkerHandler.removeCallbacks(masterWorkerRunnable);
+    lastTweetIdPersistenceHandler.removeCallbacks(lastTweetIdPersistenceRunnable);
   }
 
-//  private String getAppOAuth() throws IOException {
-//    String OAuthTokenFilePath = HTMLWorkerService.ROOT_DIR + "OAuthToken.txt";
-//    File file = new File(OAuthTokenFilePath);
-//
-//    // check if file exists
-//    if (!file.exists()) {
-//      initAppOAuth(OAuthTokenFilePath);
-//    }
-//
-//    return FileUtilsCustom.readfile(OAuthTokenFilePath);
-//  }
-//
-//  private void initAppOAuth(String path) {
-//    Log.d("UNIQUE_TAG", "initAppOAuth");
-//    // token information
-//    final String CONSUMER_KEY = "2LqkZ3BA9MUV2ZvFHMpESVnQn";
-//    final String CONSUMER_SECRET = "syU7IvNeuonSD6p77uEkySXWS6NVJimvWIbJxrYGBF3l2YAVAD";
-//    String ENCODED_CREDENTIALS = "";
-//    try {
-//      ENCODED_CREDENTIALS = "Basic " + Base64.encodeToString(
-//          (CONSUMER_KEY + ":" + CONSUMER_SECRET).getBytes("UTF-8")
-//          , Base64.NO_WRAP);
-//    } catch (UnsupportedEncodingException e) {
-//      e.printStackTrace();
-//    }
-//
-//    // get token
-//    String bearerToken = "";
-//
-//    try {
-//      URL obj = new URL("https://api.twitter.com/oauth2/token");
-//      HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
-//      con.setRequestMethod("POST");
-//      con.setRequestProperty("Authorization", ENCODED_CREDENTIALS);
-//      con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
-//      con.setRequestProperty("Host", "api.twitter.com");
-//      con.setRequestProperty("User-Agent", "GibFYP");
-//      //con.setRequestProperty("Accept-Encoding", "gzip");
-//      con.setDoOutput(true);
-//      con.setDoInput(true);
-//      con.setRequestProperty("Content-Length", "29");
-//
-//      // write to body of connection
-//      BufferedWriter wr = new BufferedWriter(new OutputStreamWriter(con.getOutputStream()));
-//      wr.write("grant_type=client_credentials");
-//      wr.flush();
-//      wr.close();
-//
-//      // get response code
-//      int responseCode = con.getResponseCode();
-//
-//      // read response from connection
-//      StringBuilder str = new StringBuilder();
-//      BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
-//      String inputLine = "";
-//      while ((inputLine = br.readLine()) != null) {
-//        str.append(inputLine + System.getProperty("line.separator"));
-//      }
-//      inputLine = str.toString();
-//
-//      // get token from json object
-//      JSONObject json = new JSONObject(inputLine);
-//      bearerToken = json.getString("access_token");
-//    } catch (Exception e) {
-//      Log.d("UNIQUE_TAG", e.toString());
-//    }
-//
-//
-//    // save oauth information to file
-//    if (!Strings.isNullOrEmpty(bearerToken)) {
-//      Log.d("UNIQUE_TAG", bearerToken);
-//      try {
-//        FileUtilsCustom.saveToFile(path, bearerToken);
-//      } catch (Exception e) {
-//      }
-//    }
-//
-//  }
+  private void initWorkers() {
+    // check if has workers
+    if (workerModel.subWorkers.size() == 0) {
+      isProperConfig = false;
+      return;
+    }
+
+    // get and set frequency and random interval from first worker
+    HTMLSubWorkerModel firstModel = workerModel.subWorkers.get(0);
+    requestInterval = firstModel.interval;
+    requestIntervalRandomVariance = firstModel.intervalRandomVariance;
+
+    // store number of subworkers
+    subWorkerSize = workerModel.subWorkers.size();
+
+    // try load saved last max id tweets json file
+    workerNameToLastMaxIdTweetMap =
+        HTMLWorkerUtils.getWorkerNameToLastMaxIdTweetJson(
+            LocalFileService.getLastMaxTweetJsonPathFromWorkerDataSaveDir(
+                workerModel.dataSaveDir
+            ));
+    // if returned nothing, make new list
+    if (workerNameToLastMaxIdTweetMap.size() == 0) {
+      for (HTMLSubWorkerModel worker : workerModel.subWorkers) {
+        workerNameToLastMaxIdTweetMap.put(worker.subWorkerName, 0L);
+      }
+    }
+  }
+
+  /**
+   * Maintains launching of subworkers
+   *
+   * @param
+   * @param handler
+   * @param workerModel
+   * @return
+   */
+  private Runnable initMasterWorkerRunnable(final Handler handler,
+                                            final TweetHTMLWorkerModel workerModel) {
+    final TweetHTMLWorker that = this;
+    return new Runnable() {
+      @Override
+      public void run() {
+        // do html task
+        initSubWorkerHTMLTask(workerModel.subWorkers.get(subWorkerIteratorCurrentIndex)).execute();
+
+        // increment index (with looparound)
+        subWorkerIteratorCurrentIndex = (subWorkerIteratorCurrentIndex + 1) % subWorkerSize;
+
+        // repeat task
+        handler.postDelayed(this, requestInterval);
+      }
+    };
+  }
+
+  private AsyncTask<Void, Void, Void> initSubWorkerHTMLTask(final HTMLSubWorkerModel htmlSubWorkerModel) {
+    return new AsyncTask<Void, Void, Void>() {
+      @Override
+      protected Void doInBackground(Void... params) {
+        try {
+          // get response
+          String response = getResponseFromHTMLCall(htmlSubWorkerModel);
+
+          // get timestamp received
+          String timestamp = Long.toString(System.currentTimeMillis());
+
+          // check if json response
+          JSONObject jo = new JSONObject();
+          boolean isValidJson = true;
+          try {
+            jo = new JSONObject(response);
+          } catch (JSONException e) {
+            isValidJson = false;
+          }
+
+          // JSON-related operations
+          if (isValidJson) {
+            // check fields not null (if specified)
+            if (!StringUtils.isEmpty(htmlSubWorkerModel.checkFieldsNotEmpty)
+                && HTMLWorkerUtils.isJsonFieldsEmpty(jo, htmlSubWorkerModel.checkFieldsNotEmpty)) {
+              return null;
+            }
+
+            // get and save tweetmaxid
+            try {
+              JSONObject search_metadata = jo.getJSONObject("search_metadata");
+              long last_max_id = search_metadata.getLong("max_id");
+              workerNameToLastMaxIdTweetMap.put(htmlSubWorkerModel.subWorkerName, last_max_id);
+            } catch (JSONException e) {
+              // cannot find search_metadata, just don't save lo
+            }
+
+            // add extra metadata
+            try {
+              JSONResponseMetadataModel meta
+                  = new JSONResponseMetadataModel(timestamp, htmlSubWorkerModel);
+              jo.put("htmlminder_custom_metadata",
+                  new JSONObject(GsonUtils.gsonStandard.toJson(meta, meta.getClass())));
+            } catch (JSONException e) {
+              // there's no reason for it to be here...
+            }
+
+            // update response with new json
+            response = jo.toString();
+          }
+
+          // add line as delimiter
+          response += "\n";
+
+          // create path to save (based on date)
+          String fullPath = htmlSubWorkerModel.dataSaveDir + "/" +
+              htmlSubWorkerModel.subWorkerName + "-" +
+              HTMLWorkerUtils.getCurrentDateInFormat("yyyy-MM-dd") + ".text";
+
+          // save response
+          FileUtilsCustom.saveToFile(fullPath, response, true);
+
+          Log.d("UNIQUE_TAG", "response: " + response);
+        } catch (HTMLWorkerException e) {
+//          e.printStackTrace();
+        } catch (IOException e) {
+          Log.d("UNIQUE_TAG", e.toString());
+          //
+        }
+
+        return null;
+      }
+    };
+  }
+
+  private String getResponseFromHTMLCall(HTMLSubWorkerModel htmlSubWorkerModel) throws HTMLWorkerException {
+    String response = "";
+
+    try {
+      // add maxtweet to subworkermodel params
+      boolean hasAddedLastMaxId = false;
+      long last_max_id = workerNameToLastMaxIdTweetMap.get(htmlSubWorkerModel.subWorkerName);
+      if (last_max_id != 0 && last_max_id > 0L) {
+        htmlSubWorkerModel.parameters.put("since_id", "" + last_max_id);
+        hasAddedLastMaxId = true;
+      }
+
+      // build url connection object
+      HttpsURLConnection con = HTMLWorkerUtils.prepareBasicConnection(htmlSubWorkerModel);
+      String ENCODED_CREDENTIALS = "Bearer " + workerModel.OAUTH_TOKEN;
+      con.setRequestProperty("Authorization", ENCODED_CREDENTIALS);
+      con.setRequestProperty("Host", "api.twitter.com");
+      con.setRequestProperty("User-Agent", "GibFYP");
+      con.setRequestProperty("Accept-Encoding", "gzip");
+
+      // remove maxtweet from subworkermodel params (if added)
+      if (hasAddedLastMaxId) {
+        htmlSubWorkerModel.parameters.remove("since_id");
+      }
+
+      // get response code
+      int responseCode = con.getResponseCode();
+      if (responseCode != HttpsURLConnection.HTTP_OK) throw new HTMLWorkerNotOKException("");
+
+      // read response from connection (using gzip)
+      StringBuilder str = new StringBuilder();
+      BufferedReader br = new BufferedReader(
+          new InputStreamReader(
+              new GZIPInputStream(con.getInputStream())));
+      String inputLine = "";
+      while ((inputLine = br.readLine()) != null) {
+        str.append(inputLine + System.getProperty("line.separator"));
+      }
+
+      // store response
+      response = str.toString();
+    } catch (IOException e) {
+      throw new HTMLWorkerCallFailedException("");
+    }
+
+    return response;
+  }
+
+  @Override
+  public void callbackOAuthRequest(Boolean result) {
+    isProperConfig = result;
+
+    startWorkerAfterCallback();
+
+    if (isProperConfig) {
+      // persist OAUTH_TOKEN by saving to json
+      String workerJsonString = HTMLWorkerModelUtils.HTMLWorkerModelToJson(workerModel);
+      try {
+        FileUtilsCustom.saveToFile(workerModel.jsonConfigFilePath,
+            workerJsonString, false);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
+  // TWEET ID PERSISTENCE
+  public Runnable initLastTweetIdPersistenceRunnable(final Handler handler,
+                                                     final HashMap<String, Long> workerNameToLastMaxIdTweetMap,
+                                                     final String savePath) {
+    return new Runnable() {
+      @Override
+      public void run() {
+        // serialize object to json
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String jsonString = gson.toJson(workerNameToLastMaxIdTweetMap, workerNameToLastMaxIdTweetMap.getClass());
+
+        // persist last tweet id map to disk
+        try {
+          FileUtilsCustom.saveToFile(savePath, jsonString, false);
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+
+        // repeat task
+        handler.postDelayed(this, lastTweetIdPersistenceInterval);
+      }
+    };
+  }
 }

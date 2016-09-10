@@ -1,12 +1,11 @@
 package com.nossbigg.htmlminder.utils;
 
+import com.google.gson.Gson;
 import com.nossbigg.htmlminder.model.AbstractHTMLWorkerModel;
 import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
 import com.nossbigg.htmlminder.model.HTMLWorkerType;
 import com.nossbigg.htmlminder.model.PlainHTMLWorkerModel;
 import com.nossbigg.htmlminder.model.TweetHTMLWorkerModel;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.EnumUtils;
@@ -23,11 +22,52 @@ import java.util.List;
  * Created by Gibson on 9/6/2016.
  */
 public class HTMLWorkerModelUtils {
-  // Gson object for serializing/deserializing
-  private static Gson gson = new GsonBuilder().setPrettyPrinting().create();
+  public static List<AbstractHTMLWorkerModel> getWorkerModelsFromDirectory(String workersDirectory) {
+    // match only .json files
+    List<String> listFileMatcher = new ArrayList<>();
+    listFileMatcher.add("json");
+
+    // get paths of all workers
+    List<File> files = new ArrayList<>();
+    files.addAll(FileUtils.listFiles(new File(workersDirectory)
+        , listFileMatcher.toArray(new String[0])
+        , true
+    ));
+
+    // import worker jsons
+    List<AbstractHTMLWorkerModel> htmlWorkerModelArrayList = new ArrayList<>();
+    Gson gson = new Gson();
+    for (File f : files) {
+      // get file content
+      String json = "";
+      try {
+        json = FileUtils.readFileToString(f);
+      } catch (IOException e) {
+        e.printStackTrace();
+        continue;
+      }
+
+      // parse json to object
+      AbstractHTMLWorkerModel abstractHTMLWorkerModel =
+          HTMLWorkerModelUtils.JsonToHTMLWorkerModel(json);
+
+      // skips if parsing failed
+      if (abstractHTMLWorkerModel == null) continue;
+
+      // ADDITIONAL VARIABLES
+      // store json config file path
+      abstractHTMLWorkerModel.jsonConfigFilePath = f.getAbsolutePath();
+
+      // adds worker to list
+      htmlWorkerModelArrayList.add(abstractHTMLWorkerModel);
+    }
+
+    // return list of workers
+    return htmlWorkerModelArrayList;
+  }
 
   public static String HTMLWorkerModelToJson(AbstractHTMLWorkerModel abstractHTMLWorker) {
-    return gson.toJson(abstractHTMLWorker, abstractHTMLWorker.getClass());
+    return GsonUtils.gsonPretty.toJson(abstractHTMLWorker, abstractHTMLWorker.getClass());
   }
 
   public static AbstractHTMLWorkerModel JsonToHTMLWorkerModel(String json, boolean isFillEmptyFields) {
@@ -69,7 +109,7 @@ public class HTMLWorkerModelUtils {
     // find empty fields and fill them with defaults (from constructor)
     switch (htmlWorkerTypeString) {
       case "PLAIN":
-        abstractHTMLWorkerModel = new PlainHTMLWorkerModel((PlainHTMLWorkerModel)abstractHTMLWorkerModel);
+        abstractHTMLWorkerModel = new PlainHTMLWorkerModel((PlainHTMLWorkerModel) abstractHTMLWorkerModel);
         break;
       case "TWEET":
         abstractHTMLWorkerModel = new TweetHTMLWorkerModel((TweetHTMLWorkerModel) abstractHTMLWorkerModel);
@@ -77,13 +117,12 @@ public class HTMLWorkerModelUtils {
     }
 
     // fill in single subworker if no subworkers
-    if(abstractHTMLWorkerModel.subWorkers.isEmpty()){
-      HTMLSubWorkerModel htmlSubWorkerModel = new HTMLSubWorkerModel("","","",0,0);
+    if (abstractHTMLWorkerModel.subWorkers.isEmpty()) {
+      HTMLSubWorkerModel htmlSubWorkerModel = new HTMLSubWorkerModel("", "", "", 0, 0);
       // fill in parameter
-      htmlSubWorkerModel.parameters.put("","");
+      htmlSubWorkerModel.parameters.put("", "");
       abstractHTMLWorkerModel.subWorkers.add(htmlSubWorkerModel);
     }
-
 
     return abstractHTMLWorkerModel;
   }
@@ -104,27 +143,32 @@ public class HTMLWorkerModelUtils {
 
     // check worker json files
     for (File f : files) {
-      // get file content
-      String json = "";
+      // make pretty
+      MakeJsonWorkerModelPretty(f);
+    }
+  }
+
+  public static void MakeJsonWorkerModelPretty(File f) {
+    // get file content
+    String json = "";
+    try {
+      json = FileUtils.readFileToString(f);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+
+    // parse json to object (fill empty fields)
+    AbstractHTMLWorkerModel abstractHTMLWorkerModel =
+        HTMLWorkerModelUtils.JsonToHTMLWorkerModel(json, true);
+
+    // if not equal, rewrite to file with pretty output
+    String prettyJson = HTMLWorkerModelToJson(abstractHTMLWorkerModel);
+    if (!StringUtils.equals(json, prettyJson)) {
       try {
-        json = FileUtils.readFileToString(f);
+        FileUtilsCustom.saveToFile(f.getAbsolutePath(), prettyJson, false);
       } catch (IOException e) {
-        e.printStackTrace();
-        continue;
-      }
-
-      // parse json to object (fill empty fields)
-      AbstractHTMLWorkerModel abstractHTMLWorkerModel =
-          HTMLWorkerModelUtils.JsonToHTMLWorkerModel(json, true);
-
-      // if not equal, rewrite to file with pretty output
-      String prettyJson = HTMLWorkerModelToJson(abstractHTMLWorkerModel);
-      if (!StringUtils.equals(json, prettyJson)) {
-        try {
-          FileUtilsCustom.saveToFile(f.getAbsolutePath(), prettyJson, false);
-        } catch (IOException e) {
-          // skip writing of file
-        }
+        // skip writing of file
       }
     }
   }

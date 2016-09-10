@@ -8,8 +8,10 @@ import com.nossbigg.htmlminder.exception.HTMLWorkerCallFailedException;
 import com.nossbigg.htmlminder.exception.HTMLWorkerException;
 import com.nossbigg.htmlminder.exception.HTMLWorkerNotOKException;
 import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
+import com.nossbigg.htmlminder.model.JSONResponseMetadataModel;
 import com.nossbigg.htmlminder.model.PlainHTMLWorkerModel;
 import com.nossbigg.htmlminder.utils.FileUtilsCustom;
+import com.nossbigg.htmlminder.utils.GsonUtils;
 import com.nossbigg.htmlminder.utils.HTMLWorkerUtils;
 
 import org.apache.commons.lang3.StringUtils;
@@ -35,9 +37,8 @@ import javax.net.ssl.HttpsURLConnection;
 public class PlainHTMLWorker extends AbstractHTMLWorker {
   public PlainHTMLWorkerModel workerModel;
 
-  public PlainHTMLWorker(PlainHTMLWorkerModel plainHTMLWorkerModel,
-                         String appDirectory) {
-    super(plainHTMLWorkerModel, appDirectory);
+  public PlainHTMLWorker(PlainHTMLWorkerModel plainHTMLWorkerModel) {
+    super(plainHTMLWorkerModel);
     workerModel = plainHTMLWorkerModel;
     initWorkers();
   }
@@ -49,14 +50,14 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
       Runnable runnable = initSubWorkerRunnable(handler,
           htmlSubWorkerModel);
 
+      // create new htmlsubworker
+      HTMLSubWorker htmlSubWorker =
+          new HTMLSubWorker(htmlSubWorkerModel, handler, runnable);
+
       // skip subworker if essential fields are missing
       if (HTMLWorkerUtils.isAnyFieldsEmpty(
           htmlSubWorkerModel.subWorkerName, htmlSubWorkerModel.url, htmlSubWorkerModel.method
       )) continue;
-
-      // create new htmlsubworker
-      HTMLSubWorker htmlSubWorker =
-          new HTMLSubWorker(htmlSubWorkerModel, handler, runnable);
 
       // add to list of workers
       namesToWorkersMap.put(htmlSubWorkerModel.subWorkerName, htmlSubWorker);
@@ -101,24 +102,45 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
           // get response
           String response = getResponseFromHTMLCall(htmlSubWorkerModel);
 
-          // check fields not null (if specified)
-          if(!StringUtils.isEmpty(htmlSubWorkerModel.checkFieldsNotEmpty)){
-            try {
-              JSONObject jo = new JSONObject(response);
-              if (HTMLWorkerUtils.isJsonFieldsEmpty(jo, htmlSubWorkerModel.checkFieldsNotEmpty)){
-                return null;
-              }
-            } catch (JSONException e) {
-              // it's not JSON, no worries
+          // get timestamp received
+          String timestamp = Long.toString(System.currentTimeMillis());
+
+          // check if json response
+          JSONObject jo = new JSONObject();
+          boolean isValidJson = true;
+          try {
+            jo = new JSONObject(response);
+          } catch (JSONException e) {
+            isValidJson = false;
+          }
+
+          // JSON-related operations
+          if (isValidJson) {
+            // check fields not null (if specified)
+            if (!StringUtils.isEmpty(htmlSubWorkerModel.checkFieldsNotEmpty)
+                && HTMLWorkerUtils.isJsonFieldsEmpty(jo, htmlSubWorkerModel.checkFieldsNotEmpty)) {
+              return null;
             }
+
+            // add extra metadata
+            try {
+              JSONResponseMetadataModel meta
+                  = new JSONResponseMetadataModel(timestamp, htmlSubWorkerModel);
+              jo.put("htmlminder_custom_metadata",
+                  new JSONObject(GsonUtils.gsonStandard.toJson(meta, meta.getClass())));
+            } catch (JSONException e) {
+              // there's no reason for it to be here...
+            }
+
+            // update response with new json
+            response = jo.toString();
           }
 
           // add line as delimiter
           response += "\n";
 
           // create path to save (based on date)
-          String subWorkerDirectory = workerDirectory + htmlSubWorkerModel.subWorkerName + "/";
-          String fullPath = subWorkerDirectory +
+          String fullPath = htmlSubWorkerModel.dataSaveDir + "/" +
               htmlSubWorkerModel.subWorkerName + "-" +
               HTMLWorkerUtils.getCurrentDateInFormat("yyyy-MM-dd") + ".text";
 
@@ -141,45 +163,9 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
   private String getResponseFromHTMLCall(HTMLSubWorkerModel htmlSubWorkerModel) throws HTMLWorkerException {
     String response = "";
 
-    // get url
-    // parses params if GET
-    String urlString = htmlSubWorkerModel.url;
-    if (StringUtils.equals("GET", htmlSubWorkerModel.method)) {
-      urlString = HTMLWorkerUtils.AddParamsToURL(urlString, htmlSubWorkerModel.parameters);
-    }
-
     try {
-      // build url object
-      URL url = new URL(urlString);
-
       // build url connection object
-      HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
-      con.setRequestMethod(htmlSubWorkerModel.method);
-
-      // if POST, send params
-      if (StringUtils.equals("POST", htmlSubWorkerModel.method)) {
-        // set form urlencoded
-        con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
-
-        // enable output stream
-        con.setDoOutput(true);
-
-        // open connection
-        BufferedWriter wr = new BufferedWriter(new OutputStreamWriter(con.getOutputStream()));
-
-        // send params
-        for (Map.Entry<String, String> entry : htmlSubWorkerModel.parameters.entrySet()) {
-          StringBuilder sb = new StringBuilder();
-          sb.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
-          sb.append("=");
-          sb.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
-          wr.write(sb.toString());
-        }
-
-        // close connection
-        wr.flush();
-        wr.close();
-      }
+      HttpsURLConnection con = HTMLWorkerUtils.prepareBasicConnection(htmlSubWorkerModel);
 
       // get response code
       int responseCode = con.getResponseCode();
