@@ -51,7 +51,6 @@ import javax.net.ssl.HttpsURLConnection;
  * Created by Gibson on 8/12/2016.
  */
 public class SampleService extends Service {
-  // FIXME
   private final String ROOT_DIR = "";
   private boolean isInitialized = false;
   private PowerManager.WakeLock wakeLock;
@@ -86,7 +85,7 @@ public class SampleService extends Service {
 //        String twitterData = getTwitterData();
 //
 //        // append to file
-//        String path = ROOT_DIR + "responses.txt";
+//        String path = appDir + "responses.txt";
 //        try {
 //          saveToFile(path, twitterData);
 //        } catch (IOException e) {
@@ -459,11 +458,6 @@ public class SampleService extends Service {
     mNotificationManager.notify(NOTIFICATION_ID, mNotifyBuilder.build());
   }
 
-
-  /**
-   * @return
-   * @throws IOException
-   */
 
   private String getAppOAuth() throws IOException {
     String OAuthTokenFilePath = ROOT_DIR + "OAuthToken.txt";
