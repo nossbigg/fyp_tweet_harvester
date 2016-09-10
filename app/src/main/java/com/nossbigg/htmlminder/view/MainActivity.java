@@ -10,6 +10,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.nossbigg.htmlminder.R;
@@ -41,8 +42,12 @@ public class MainActivity extends AppCompatActivity {
     activityBagModel.localFileService
         = new LocalFileService(activityBagModel.configService);
 
+    // update appDir label
+    setDirDetailsLabel(activityBagModel.localFileService.appDir,
+        activityBagModel.localFileService.appInitDir);
+
     // starts AbstractHTMLWorker service
-    startHTMLWorkerService(activityBagModel);
+//    startHTMLWorkerService(activityBagModel);
 
     // bind listener for button
     Button generateWorkerButton = (Button) findViewById(R.id.button);
@@ -57,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
 //    goToHome();
   }
 
-  private void startHTMLWorkerService(ActivityBagModel activityBagModel){
+  private void startHTMLWorkerService(ActivityBagModel activityBagModel) {
     // declare intent
     Intent mServiceIntent = new Intent(this, HTMLWorkerService.class);
 
@@ -71,22 +76,23 @@ public class MainActivity extends AppCompatActivity {
     Toast.makeText(getApplicationContext(), "Starting HTMLWorker service...", Toast.LENGTH_SHORT).show();
   }
 
-  private void generateWorkers(){
+  private void generateWorkers() {
     AppSampleJsonConfigGenerator gen
         = new AppSampleJsonConfigGenerator(activityBagModel.localFileService.appDir);
     gen.generateSampleWorkers();
 //    gen.readWorkers();
   }
 
-  // TODO set labels to reflect directories set
-  private void updateDirDetailsLabel(String appDir, String appInitDir){
-
+  private void setDirDetailsLabel(String appDir, String appInitDir) {
+    String info = "appDir: "+appDir+"\n"+"appInitDir: "+appInitDir;
+    TextView t = (TextView) findViewById(R.id.dirDetails);
+    t.setText(info);
   }
 
   /**
    * Redirects user to homescreen
    */
-  private void goToHome(){
+  private void goToHome() {
     Intent startMain = new Intent(Intent.ACTION_MAIN);
     startMain.addCategory(Intent.CATEGORY_HOME);
     startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
