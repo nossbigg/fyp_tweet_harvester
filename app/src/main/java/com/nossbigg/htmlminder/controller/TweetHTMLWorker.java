@@ -36,7 +36,7 @@ import javax.net.ssl.HttpsURLConnection;
 /**
  * Tweet HTML Worker
  * Note: Tweets are collected sequentially by worker order, and not in parallel.
- * <p>
+ * <p/>
  * Created by Gibson on 9/6/2016.
  */
 public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallbackHandler {
@@ -272,7 +272,9 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
           // save response
           FileUtilsCustom.saveToFile(fullPath, response, true);
 
-          Log.d("UNIQUE_TAG", "response: " + response);
+          Log.d("UNIQUE_TAG",
+              workerModel.workerName + "|" + htmlSubWorkerModel.subWorkerName
+                  + "|" + "response: " + response);
         } catch (HTMLWorkerException e) {
 //          e.printStackTrace();
         } catch (IOException e) {

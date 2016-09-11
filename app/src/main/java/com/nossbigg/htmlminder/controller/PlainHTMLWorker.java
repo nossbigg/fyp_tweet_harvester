@@ -181,7 +181,9 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
           // save response
           FileUtilsCustom.saveToFile(fullPath, response, true);
 
-          Log.d("UNIQUE_TAG", "response: " + response);
+          Log.d("UNIQUE_TAG",
+              workerModel.workerName + "|" + htmlSubWorkerModel.subWorkerName
+                  + "|" + "response: " + response);
         } catch (HTMLWorkerException e) {
 //          e.printStackTrace();
         } catch (IOException e) {
