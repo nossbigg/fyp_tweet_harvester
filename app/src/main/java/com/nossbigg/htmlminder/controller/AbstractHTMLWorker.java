@@ -17,6 +17,8 @@ public abstract class AbstractHTMLWorker {
 
   // Store notification builder reference
   public NotificationCompat.Builder notificationBuilder;
+  // store if worker has been called to destroy, will not accept any responses
+  public boolean isWorkerDestroy = false;
 
   public AbstractHTMLWorker(AbstractHTMLWorkerModel abstractHTMLWorkerModel) {
     this.abstractHTMLWorkerModel = abstractHTMLWorkerModel;

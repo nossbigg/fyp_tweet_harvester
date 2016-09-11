@@ -6,7 +6,6 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -29,7 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -61,6 +59,8 @@ public class HTMLWorkerService extends Service {
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startid) {
+    Log.d("UNIQUE_TAG", "Starting HTMLWorkerService..");
+
     // load reference to activityBagModel
     activityBagModel = (ActivityBagModel) intent.getSerializableExtra("activityBagModel");
 
@@ -79,7 +79,7 @@ public class HTMLWorkerService extends Service {
 
     init();
 
-    return START_STICKY;
+    return START_NOT_STICKY;
   }
 
   public void init() {
@@ -108,6 +108,23 @@ public class HTMLWorkerService extends Service {
     HTMLWorkerModelUtils.MakeAllJsonWorkerModelsPretty(
         activityBagModel.localFileService.getWorkerConfigsDir());
   }
+
+  @Override
+  public void onDestroy() {
+    Log.d("UNIQUE_TAG", "Stopping HTMLWorkerService..");
+
+    // stop as foregrounnd service
+    stopForeground(true);
+
+    // stop notifications
+    stopNotifications();
+
+    for (AbstractHTMLWorker worker : HTMLWorkersHashMap.values()) {
+      // stop all abstractworkers
+      worker.stopWorker();
+    }
+  }
+
 
   public AbstractHTMLWorker initWorker(AbstractHTMLWorkerModel abstractHTMLWorkerModel) throws IOException {
     AbstractHTMLWorker abstractHTMLWorker;
@@ -175,6 +192,11 @@ public class HTMLWorkerService extends Service {
 
   public void stopNotifications() {
     notificationHandler.removeCallbacks(notificationRunnable);
+
+    // remove existing notifications
+    for (Integer notificationId : existingNotifications) {
+      removeNotification(notificationId);
+    }
   }
 
   public Runnable initNotificationRunnable(final Handler handler,

@@ -21,9 +21,18 @@
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Generate Workers"
-        android:id="@+id/button"
+        android:text="Restart Service"
+        android:id="@+id/restartServiceButton"
         android:layout_below="@+id/dirDetails"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Stop Service"
+        android:id="@+id/stopServiceButton"
+        android:layout_below="@+id/restartServiceButton"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"/>
 

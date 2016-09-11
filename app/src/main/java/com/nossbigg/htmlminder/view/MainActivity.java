@@ -19,6 +19,8 @@ import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
+  static Intent HTMLWorkerServiceIntent;
+
   static boolean isStartedActivity = false;
   static ActivityBagModel activityBagModel;
 
@@ -29,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     setContentView(R.layout.activity_main);
 
     // if activity has started, do not re-init the program
-    if(!isStartedActivity){
+    if (!isStartedActivity) {
       // create ActivityBagModel
       activityBagModel = new ActivityBagModel();
 
@@ -41,11 +43,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // bind listener for button
-    Button generateWorkerButton = (Button) findViewById(R.id.button);
+    Button generateWorkerButton = (Button) findViewById(R.id.restartServiceButton);
     generateWorkerButton.setOnClickListener(new View.OnClickListener() {
       @Override
       public void onClick(View v) {
-        generateWorkers();
+        restartHTMLWorkerService();
+      }
+    });
+
+    Button stopWorkerButton = (Button) findViewById(R.id.stopServiceButton);
+    stopWorkerButton.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        stopHTMLWorkerService();
       }
     });
 
@@ -76,16 +86,25 @@ public class MainActivity extends AppCompatActivity {
 
   private void startHTMLWorkerService(ActivityBagModel activityBagModel) {
     // declare intent
-    Intent mServiceIntent = new Intent(this, HTMLWorkerService.class);
+    HTMLWorkerServiceIntent = new Intent(this, HTMLWorkerService.class);
 
     // add root directory to intent
-    mServiceIntent.putExtra("activityBagModel", activityBagModel);
+    HTMLWorkerServiceIntent.putExtra("activityBagModel", activityBagModel);
 
     // start service
-    this.startService(mServiceIntent);
+    this.startService(HTMLWorkerServiceIntent);
 
     // notify user
     Toast.makeText(getApplicationContext(), "Starting HTMLWorker service...", Toast.LENGTH_SHORT).show();
+  }
+
+  private void stopHTMLWorkerService() {
+    this.stopService(HTMLWorkerServiceIntent);
+  }
+
+  private void restartHTMLWorkerService() {
+    stopHTMLWorkerService();
+    startHTMLWorkerService(activityBagModel);
   }
 
   private void generateWorkers() {
@@ -96,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private void setDirDetailsLabel(String appDir, String appInitDir) {
-    String info = "appDir: "+appDir+"\n"+"appInitDir: "+appInitDir;
+    String info = "appDir: " + appDir + "\n" + "appInitDir: " + appInitDir;
     TextView t = (TextView) findViewById(R.id.dirDetails);
     t.setText(info);
   }

@@ -20,16 +20,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
-import java.util.Set;
 
 import javax.net.ssl.HttpsURLConnection;
 
@@ -72,6 +66,7 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
 
   @Override
   public void startWorker() {
+    // start all workers
     for (Map.Entry<String, HTMLSubWorker> entry : namesToWorkersMap.entrySet()) {
       HTMLSubWorker htmlSubWorker = entry.getValue();
       htmlSubWorker.handler.post(htmlSubWorker.runnable);
@@ -80,6 +75,10 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
 
   @Override
   public void stopWorker() {
+    // update destroy flag
+    isWorkerDestroy = true;
+
+    // stop all workers
     for (Map.Entry<String, HTMLSubWorker> entry : namesToWorkersMap.entrySet()) {
       HTMLSubWorker htmlSubWorker = entry.getValue();
       htmlSubWorker.handler.removeCallbacks(htmlSubWorker.runnable);
@@ -130,6 +129,9 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
 
           // get response
           String response = getResponseFromHTMLCall(htmlSubWorker);
+
+          // TERMINATE IF DESTROY FLAG IS TRUE
+          if (isWorkerDestroy) return null;
 
           // get timestamp received
           Long timestamp = System.currentTimeMillis();

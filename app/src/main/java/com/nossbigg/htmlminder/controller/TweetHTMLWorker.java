@@ -56,7 +56,7 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
   public long lastTweetIdPersistenceInterval = 5000;
 
   // LOOPING THREAD VARIABLES
-  private Iterator<Map.Entry<String,HTMLSubWorker>> namesToWorkersMapIterator;
+  private Iterator<Map.Entry<String, HTMLSubWorker>> namesToWorkersMapIterator;
 
   // Handler and runnable for master loop
   public Handler masterWorkerHandler = new Handler();
@@ -97,7 +97,13 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
 
   @Override
   public void stopWorker() {
+    // update destroy flag
+    isWorkerDestroy = true;
+
+    // stop master worker
     masterWorkerHandler.removeCallbacks(masterWorkerRunnable);
+
+    // stop persistence worker
     lastTweetIdPersistenceHandler.removeCallbacks(lastTweetIdPersistenceRunnable);
   }
 
@@ -158,7 +164,7 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
             ));
     // if returned nothing, make new list
     if (workerNameToLastMaxIdTweetMap.size() == 0) {
-      for(String subWorkerName : namesToWorkersMap.keySet()){
+      for (String subWorkerName : namesToWorkersMap.keySet()) {
         workerNameToLastMaxIdTweetMap.put(subWorkerName, 0L);
       }
     }
@@ -180,7 +186,7 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
       @Override
       public void run() {
         // reset iterator if at end
-        if(!namesToWorkersMapIterator.hasNext()){
+        if (!namesToWorkersMapIterator.hasNext()) {
           namesToWorkersMapIterator = namesToWorkersMap.entrySet().iterator();
         }
 
@@ -189,6 +195,7 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
 
         // do html task
         initSubWorkerHTMLTask(subWorker).execute();
+
         // repeat task
         handler.postDelayed(this, requestInterval);
       }
@@ -204,6 +211,9 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
 
           // get response
           String response = getResponseFromHTMLCall(htmlSubWorkerModel);
+
+          // TERMINATE IF DESTROY FLAG IS TRUE
+          if (isWorkerDestroy) return null;
 
           // get timestamp received
           Long timestamp = System.currentTimeMillis();
@@ -257,7 +267,7 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
           // create path to save (based on date)
           String fullPath = htmlSubWorkerModel.dataSaveDir + "/" +
               htmlSubWorkerModel.subWorkerName + "-" +
-              HTMLWorkerUtils.getDateInFormat(new Date(), "yyyy-MM-dd")  + ".text";
+              HTMLWorkerUtils.getDateInFormat(new Date(), "yyyy-MM-dd") + ".text";
 
           // save response
           FileUtilsCustom.saveToFile(fullPath, response, true);
