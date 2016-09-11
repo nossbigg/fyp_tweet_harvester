@@ -3,7 +3,6 @@ package com.nossbigg.htmlminder.utils;
 import android.os.AsyncTask;
 
 import com.google.gson.Gson;
-import com.nossbigg.htmlminder.controller.AsyncCallbackHandler;
 import com.nossbigg.htmlminder.controller.TweetHTMLWorker;
 import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
 import com.nossbigg.htmlminder.model.TweetHTMLWorkerModel;
@@ -27,7 +26,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.ListIterator;
+import java.util.Iterator;
 import java.util.Map;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -36,7 +35,7 @@ import javax.net.ssl.HttpsURLConnection;
  * Created by Gibson on 8/30/2016.
  */
 public class HTMLWorkerUtils {
-  public static String AddParamsToURL(String url, Map<String, String> params) {
+  public static String addParamsToURL(String url, Map<String, String> params) {
     // if empty parameters, return
     if (params.size() == 0) {
       return url;
@@ -69,7 +68,7 @@ public class HTMLWorkerUtils {
     return sb.toString();
   }
 
-  public static int WorkerNameToNotificationID(String workerName) {
+  public static int generateWorkerNameToNotificationID(String workerName) {
     int result = 0;
     for (char c : workerName.toCharArray()) {
       result += Character.getNumericValue(c);
@@ -141,8 +140,19 @@ public class HTMLWorkerUtils {
     return true;
   }
 
-  public static String getCurrentDateInFormat(String format) {
-    SimpleDateFormat sdfDate = new SimpleDateFormat(format);
+  public static String getDateInFormat(Date date, String dateFormat){
+    SimpleDateFormat sdfDate = new SimpleDateFormat(dateFormat);
+    return sdfDate.format(date);
+  }
+
+  public static String convertEpochToDateFormat(long epoch, String dateFormat){
+    SimpleDateFormat sdfDate = new SimpleDateFormat(dateFormat);
+    Date epochDate = new Date(epoch);
+    return sdfDate.format(epochDate);
+  }
+
+  public static String getCurrentDateInFormat(String dateFormat) {
+    SimpleDateFormat sdfDate = new SimpleDateFormat(dateFormat);
     Date now = new Date();
     return sdfDate.format(now);
   }
@@ -151,7 +161,7 @@ public class HTMLWorkerUtils {
     // parses params if GET
     String urlString = htmlSubWorkerModel.url;
     if (StringUtils.equals("GET", htmlSubWorkerModel.method)) {
-      urlString = HTMLWorkerUtils.AddParamsToURL(urlString, htmlSubWorkerModel.parameters);
+      urlString = HTMLWorkerUtils.addParamsToURL(urlString, htmlSubWorkerModel.parameters);
     }
 
     // build url object

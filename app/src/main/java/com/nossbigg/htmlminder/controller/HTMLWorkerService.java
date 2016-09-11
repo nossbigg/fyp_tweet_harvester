@@ -1,25 +1,35 @@
 package com.nossbigg.htmlminder.controller;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.os.AsyncTask;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.annotation.Nullable;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
+import com.nossbigg.htmlminder.R;
 import com.nossbigg.htmlminder.model.AbstractHTMLWorkerModel;
 import com.nossbigg.htmlminder.model.ActivityBagModel;
 import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
 import com.nossbigg.htmlminder.model.PlainHTMLWorkerModel;
 import com.nossbigg.htmlminder.model.TweetHTMLWorkerModel;
 import com.nossbigg.htmlminder.utils.HTMLWorkerModelUtils;
+import com.nossbigg.htmlminder.view.MainActivity;
 
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -77,42 +87,49 @@ public class HTMLWorkerService extends Service {
     List<AbstractHTMLWorkerModel> abstractHTMLWorkerModelList
         = getWorkerModels(appDirectory);
 
-    // start services accordingly
+    //
     for (AbstractHTMLWorkerModel abstractHTMLWorkerModel : abstractHTMLWorkerModelList) {
-      startWorker(abstractHTMLWorkerModel);
+      try {
+        // init worker
+        AbstractHTMLWorker abstractHTMLWorker = initWorker(abstractHTMLWorkerModel);
+        // add worker to list
+        HTMLWorkersHashMap.put(abstractHTMLWorker.abstractHTMLWorkerModel.workerName, abstractHTMLWorker);
+        // start worker
+        abstractHTMLWorker.startWorker();
+      } catch (IOException e) {
+        // bad worker model
+      }
     }
+
+    // start notifications
+    startNotifications(HTMLWorkersHashMap);
 
     // make worker json files neat + repair
     HTMLWorkerModelUtils.MakeAllJsonWorkerModelsPretty(
         activityBagModel.localFileService.getWorkerConfigsDir());
   }
 
-  public void startWorker(final AbstractHTMLWorkerModel abstractHTMLWorkerModel) {
+  public AbstractHTMLWorker initWorker(AbstractHTMLWorkerModel abstractHTMLWorkerModel) throws IOException {
+    AbstractHTMLWorker abstractHTMLWorker;
     Log.d("UNIQUE_TAG", abstractHTMLWorkerModel.workerName);
 
-    // create worker object, add to hashmap
+    // create worker object
     switch (abstractHTMLWorkerModel.htmlWorkerType) {
       case PLAIN: {
-        HTMLWorkersHashMap.put(
-            abstractHTMLWorkerModel.workerName,
-            new PlainHTMLWorker((PlainHTMLWorkerModel) abstractHTMLWorkerModel));
+        abstractHTMLWorker = new PlainHTMLWorker((PlainHTMLWorkerModel) abstractHTMLWorkerModel);
         break;
       }
       case TWEET: {
-        HTMLWorkersHashMap.put(
-            abstractHTMLWorkerModel.workerName,
-            new TweetHTMLWorker((TweetHTMLWorkerModel) abstractHTMLWorkerModel));
+        abstractHTMLWorker = new TweetHTMLWorker((TweetHTMLWorkerModel) abstractHTMLWorkerModel);
         break;
       }
       default: {
         // unknown type
-        return;
+        throw new IOException("Invalid worker type: " + abstractHTMLWorkerModel.htmlWorkerType);
       }
     }
 
-    // start worker
-    AbstractHTMLWorker abstractHTMLWorker = HTMLWorkersHashMap.get(abstractHTMLWorkerModel.workerName);
-    abstractHTMLWorker.startWorker();
+    return abstractHTMLWorker;
   }
 
   public List<AbstractHTMLWorkerModel> getWorkerModels(String appDirectory) {
@@ -140,4 +157,101 @@ public class HTMLWorkerService extends Service {
     return workerModels;
   }
 
+  // NOTIFICATIONS
+  Handler notificationHandler = new Handler();
+  Runnable notificationRunnable = null;
+  NotificationManager nMgr = null;
+  HashSet<Integer> existingNotifications = new HashSet<>();
+
+  public void startNotifications(HashMap<String, AbstractHTMLWorker> HTMLWorkersHashMap) {
+    if (nMgr == null) {
+      nMgr = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+    }
+    if (notificationRunnable == null) {
+      notificationRunnable = initNotificationRunnable(notificationHandler, HTMLWorkersHashMap, 2000);
+    }
+    notificationHandler.post(notificationRunnable);
+  }
+
+  public void stopNotifications() {
+    notificationHandler.removeCallbacks(notificationRunnable);
+  }
+
+  public Runnable initNotificationRunnable(final Handler handler,
+                                           final HashMap<String, AbstractHTMLWorker> HTMLWorkersHashMap,
+                                           final long interval) {
+    return new Runnable() {
+      @Override
+      public void run() {
+        // maintain list of notifications that have been interacted with
+        HashSet<Integer> notificationsInteractedList = new HashSet<>();
+
+        for (AbstractHTMLWorker worker : HTMLWorkersHashMap.values()) {
+          int notificationId = worker.notificationID;
+
+          // add to list of notifications interacted with
+          notificationsInteractedList.add(notificationId);
+
+          // get notification content
+          String content = worker.getNotificationInfo();
+
+          // create notification if not existing
+          if (!existingNotifications.contains(notificationId)) {
+            NotificationCompat.Builder builder = createNotification(
+                notificationId, worker);
+            // save builder reference
+            worker.notificationBuilder = builder;
+          } else {
+            // notification exists, update
+            updateNotification(notificationId, content, worker.notificationBuilder);
+          }
+        }
+
+        // remove dangling tasks
+        HashSet<Integer> danglingNotifications = new HashSet<>(existingNotifications);
+        danglingNotifications.removeAll(notificationsInteractedList);
+        for (Integer notificationID : danglingNotifications) {
+          removeNotification(notificationID);
+        }
+
+        // save notifications to existing
+        existingNotifications = notificationsInteractedList;
+
+        // repeat task
+        handler.postDelayed(this, interval);
+      }
+    };
+  }
+
+  public void removeNotification(int notificationID) {
+    nMgr.cancel(notificationID);
+  }
+
+  public NotificationCompat.Builder createNotification(int notificationID
+      , AbstractHTMLWorker worker) {
+    String content = worker.getNotificationInfo();
+
+    Intent notificationIntent = new Intent(this, MainActivity.class);
+    PendingIntent pendingIntent =
+        PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
+    final NotificationCompat.Builder mBuilder =
+        new NotificationCompat.Builder(this)
+            .setSmallIcon(R.drawable.ic_stat_name)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setContentTitle("HTMLMinder: " + worker.abstractHTMLWorkerModel.workerName)
+            .setContentText(content)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(content));
+    Notification notification = mBuilder.build();
+
+    startForeground(notificationID, notification);
+    return mBuilder;
+  }
+
+  public void updateNotification(int notificationID, String content, NotificationCompat.Builder notificationBuilder) {
+    notificationBuilder.setContentText(content);
+    notificationBuilder.setStyle(new NotificationCompat.BigTextStyle().bigText(content));
+    nMgr.notify(notificationID, notificationBuilder.build());
+  }
 }

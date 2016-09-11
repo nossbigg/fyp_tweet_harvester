@@ -20,7 +20,8 @@ public class HTMLSubWorkerModel {
   // for runtime only, will not be persisted
   public transient String dataSaveDir = "";
 
-  public HTMLSubWorkerModel(String subWorkerName, String url, String method, long interval, long intervalRandomVariance) {
+  public HTMLSubWorkerModel(String subWorkerName, String url
+      , String method, long interval, long intervalRandomVariance) {
     this.subWorkerName = subWorkerName;
     this.url = url;
     this.method = method;
@@ -28,8 +29,8 @@ public class HTMLSubWorkerModel {
     this.intervalRandomVariance = intervalRandomVariance;
   }
 
-  public HTMLSubWorkerModel(HTMLSubWorkerModel h){
-    subWorkerName = (h.subWorkerName != null) ? h.subWorkerName : subWorkerName ;
+  public HTMLSubWorkerModel(HTMLSubWorkerModel h) {
+    subWorkerName = (h.subWorkerName != null) ? h.subWorkerName : subWorkerName;
     description = (h.description != null) ? h.description : description;
     url = (h.url != null) ? h.url : url;
     method = (h.method != null) ? h.method : method;

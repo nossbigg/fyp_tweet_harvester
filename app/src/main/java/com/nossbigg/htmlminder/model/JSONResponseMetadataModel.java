@@ -6,12 +6,12 @@ import java.util.HashMap;
  * Created by Gibson on 9/10/2016.
  */
 public class JSONResponseMetadataModel {
-  public String timestamp_received_epoch = "";
+  public long timestamp_received_epoch = 0L;
   public String query_url = "";
   public String query_method = "";
   public HashMap<String, String> parameters = new HashMap<>();
 
-  public JSONResponseMetadataModel(String timestamp_received_epoch,
+  public JSONResponseMetadataModel(long timestamp_received_epoch,
                                    HTMLSubWorkerModel subWorker) {
     this.timestamp_received_epoch = timestamp_received_epoch;
     this.query_url = subWorker.url;
