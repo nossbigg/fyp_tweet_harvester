@@ -19,7 +19,8 @@ import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
-  ActivityBagModel activityBagModel;
+  static boolean isStartedActivity = false;
+  static ActivityBagModel activityBagModel;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -27,8 +28,36 @@ public class MainActivity extends AppCompatActivity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
-    // create ActivityBagModel
-    activityBagModel = new ActivityBagModel();
+    // if activity has started, do not re-init the program
+    if(!isStartedActivity){
+      // create ActivityBagModel
+      activityBagModel = new ActivityBagModel();
+
+      // init program
+      initProgram(activityBagModel);
+
+      // update started activity flag
+      isStartedActivity = true;
+    }
+
+    // bind listener for button
+    Button generateWorkerButton = (Button) findViewById(R.id.button);
+    generateWorkerButton.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        generateWorkers();
+      }
+    });
+
+    // update appDir label
+    setDirDetailsLabel(activityBagModel.localFileService.appDir,
+        activityBagModel.localFileService.appInitDir);
+
+    // close app by going to homescreen
+//    goToHome();
+  }
+
+  private void initProgram(ActivityBagModel activityBagModel) {
     try {
       activityBagModel.configService = new ConfigService(this);
     } catch (IOException e) {
@@ -43,18 +72,6 @@ public class MainActivity extends AppCompatActivity {
 
     // starts AbstractHTMLWorker service
     startHTMLWorkerService(activityBagModel);
-
-    // bind listener for button
-    Button generateWorkerButton = (Button) findViewById(R.id.button);
-    generateWorkerButton.setOnClickListener(new View.OnClickListener() {
-      @Override
-      public void onClick(View v) {
-        generateWorkers();
-      }
-    });
-
-    // close app by going to homescreen
-//    goToHome();
   }
 
   private void startHTMLWorkerService(ActivityBagModel activityBagModel) {
