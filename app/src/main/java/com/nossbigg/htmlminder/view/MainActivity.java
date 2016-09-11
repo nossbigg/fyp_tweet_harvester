@@ -19,10 +19,10 @@ import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
-  static Intent HTMLWorkerServiceIntent;
+  Intent HTMLWorkerServiceIntent;
 
   static boolean isStartedActivity = false;
-  static ActivityBagModel activityBagModel;
+  ActivityBagModel activityBagModel;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {

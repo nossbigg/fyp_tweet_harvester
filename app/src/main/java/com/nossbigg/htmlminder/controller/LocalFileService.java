@@ -1,15 +1,24 @@
 package com.nossbigg.htmlminder.controller;
 
+import android.os.Handler;
+import android.util.Log;
+
 import com.nossbigg.htmlminder.model.AbstractHTMLWorkerModel;
 import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
+import com.nossbigg.htmlminder.utils.FileUtilsCustom;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.time.DateUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manages local storage structure
@@ -38,6 +47,11 @@ public class LocalFileService implements Serializable {
   // ..appDir/config/workers
   private static final String WORKER_CONFIG_DIR = CONFIG_DIR + "/workers";
 
+  // compress service variables
+  boolean compressSvcStarted = false;
+  transient Handler compressSvcHandler = new Handler();
+  transient Runnable compressSvcRunnable = null;
+
   public LocalFileService(ConfigService configService) {
     // update app init dir and app dir
     appInitDir = configService.appInitConfig.HERE_DIR;
@@ -45,6 +59,82 @@ public class LocalFileService implements Serializable {
 
     // create folder structure
     createAppFolderStructure(appDir);
+
+    // start compress service
+    startCompressSvc();
+  }
+
+  public void startCompressSvc() {
+    // don't start service if already started
+    if (compressSvcStarted) return;
+
+    // init runnable if not initialized
+    if (compressSvcRunnable == null) {
+      compressSvcRunnable = initCompressSvcRunnable(compressSvcHandler);
+    }
+
+    // run service
+    compressSvcHandler.post(compressSvcRunnable);
+  }
+
+  public void stopCompressSvc() {
+    compressSvcHandler.removeCallbacks(compressSvcRunnable);
+    compressSvcStarted = false;
+  }
+
+  public Runnable initCompressSvcRunnable(final Handler handler) {
+    return new Runnable() {
+      @Override
+      public void run() {
+        Log.d("UNIQUE_TAG", "Running Compress Service..." + new Date().toString());
+
+        // match only .text files
+        List<String> listFileMatcher = new ArrayList<>();
+        listFileMatcher.add("text");
+
+        // get paths of all .text files
+        HashSet<File> files = new HashSet<>();
+        files.addAll(FileUtils.listFiles(new File(getDataSaveDir())
+            , listFileMatcher.toArray(new String[0])
+            , true
+        ));
+
+        // compresses files
+        Date now = new Date();
+        for (File f : files) {
+          // if file is older than 1 day
+          if (now.getTime() - f.lastModified() > TimeUnit.HOURS.toMillis(1)) {
+            String filePath = f.getAbsolutePath();
+            String compressedFilePath = filePath + ".zip";
+
+            // skip files that have already been compressed
+            if (new File(compressedFilePath).exists()) continue;
+
+            // compress file
+            FileUtilsCustom.makeZipFromFiles(compressedFilePath, filePath);
+
+            // delete file
+//            try {
+//              FileUtils.forceDelete(f);
+//            } catch (IOException e) {
+//            }
+          }
+        }
+
+        // repeat task at around 12:01
+        Calendar toStartCal = Calendar.getInstance();
+        toStartCal.setTime(new Date());
+        toStartCal.add(Calendar.DATE, 1);
+        toStartCal.set(Calendar.HOUR_OF_DAY, 0);
+        toStartCal.set(Calendar.MINUTE, 1);
+        toStartCal.set(Calendar.SECOND, 0);
+        toStartCal.set(Calendar.MILLISECOND, 0);
+        // calculate timediff
+        long interval = toStartCal.getTime().getTime() - new Date().getTime();
+        // set time to run
+        handler.postDelayed(this, interval);
+      }
+    };
   }
 
   /**
@@ -96,11 +186,5 @@ public class LocalFileService implements Serializable {
       AbstractHTMLWorkerModel abstractHTMLWorkerModel, HTMLSubWorkerModel htmlSubWorkerModel) {
     return getWorkerDataSaveDir(abstractHTMLWorkerModel)
         + "/" + htmlSubWorkerModel.subWorkerName;
-  }
-
-  // COMPRESSION TASK
-  // TODO compress files that are older than set threshold
-  public void compressFilesOlderThanThreshold(String rootDir, List<String> matchPatterns, long thresholdMs) {
-
   }
 }
