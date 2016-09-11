@@ -1,12 +1,7 @@
 package com.nossbigg.htmlminder.view;
 
-import android.Manifest;
-import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
@@ -15,10 +10,10 @@ import android.widget.Toast;
 
 import com.nossbigg.htmlminder.R;
 import com.nossbigg.htmlminder.controller.ConfigService;
+import com.nossbigg.htmlminder.controller.HTMLWorkerService;
 import com.nossbigg.htmlminder.controller.LocalFileService;
 import com.nossbigg.htmlminder.model.ActivityBagModel;
 import com.nossbigg.htmlminder.utils.AppSampleJsonConfigGenerator;
-import com.nossbigg.htmlminder.controller.HTMLWorkerService;
 
 import java.io.IOException;
 
@@ -47,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
         activityBagModel.localFileService.appInitDir);
 
     // starts AbstractHTMLWorker service
-//    startHTMLWorkerService(activityBagModel);
+    startHTMLWorkerService(activityBagModel);
 
     // bind listener for button
     Button generateWorkerButton = (Button) findViewById(R.id.button);

@@ -8,6 +8,7 @@ import com.nossbigg.htmlminder.exception.HTMLWorkerCallFailedException;
 import com.nossbigg.htmlminder.exception.HTMLWorkerException;
 import com.nossbigg.htmlminder.exception.HTMLWorkerNotOKException;
 import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
+import com.nossbigg.htmlminder.model.HTMLWorkerNotificationModel;
 import com.nossbigg.htmlminder.model.JSONResponseMetadataModel;
 import com.nossbigg.htmlminder.model.PlainHTMLWorkerModel;
 import com.nossbigg.htmlminder.utils.FileUtilsCustom;
@@ -28,6 +29,7 @@ import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
+import java.util.Set;
 
 import javax.net.ssl.HttpsURLConnection;
 
@@ -45,18 +47,22 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
 
   private void initWorkers() {
     for (HTMLSubWorkerModel htmlSubWorkerModel : workerModel.subWorkers) {
-      // make new runnable
+      // init htmlsubworker object
+      // handler
       Handler handler = new Handler();
-      Runnable runnable = initSubWorkerRunnable(handler,
-          htmlSubWorkerModel);
-
-      // create new htmlsubworker
+      // htmlsubworker
       HTMLSubWorker htmlSubWorker =
-          new HTMLSubWorker(htmlSubWorkerModel, handler, runnable);
+          new HTMLSubWorker(htmlSubWorkerModel, handler);
+      // runnable
+      Runnable runnable = initSubWorkerRunnable(handler,
+          htmlSubWorker);
+      // assign runnable to htmlsubworker
+      htmlSubWorker.assignRunnable(runnable);
 
       // skip subworker if essential fields are missing
       if (HTMLWorkerUtils.isAnyFieldsEmpty(
-          htmlSubWorkerModel.subWorkerName, htmlSubWorkerModel.url, htmlSubWorkerModel.method
+          htmlSubWorkerModel.subWorkerName, htmlSubWorkerModel.url
+          , htmlSubWorkerModel.method
       )) continue;
 
       // add to list of workers
@@ -80,30 +86,53 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
     }
   }
 
+  @Override
+  public String getNotificationInfo() {
+    StringBuilder note = new StringBuilder();
+
+    for (Map.Entry<String, HTMLSubWorker> set : namesToWorkersMap.entrySet()) {
+      HTMLSubWorker subWorker = set.getValue();
+      HTMLWorkerNotificationModel notificationModel = subWorker.notificationModel;
+      note.append(subWorker.htmlSubWorkerModel.subWorkerName + ": ");
+      note.append(
+          // display none if null
+          (notificationModel.lastPulled_epoch != 0L) ?
+              HTMLWorkerUtils.convertEpochToDateFormat(
+                  notificationModel.lastPulled_epoch, "d/M/yyyy hh:mm:ss a") :
+              "None"
+      );
+      note.append("\n");
+    }
+
+    return note.toString();
+  }
+
   private Runnable initSubWorkerRunnable(final Handler handler,
-                                         final HTMLSubWorkerModel htmlSubWorkerModel) {
+                                         final HTMLSubWorker htmlSubWorker) {
     return new Runnable() {
       @Override
       public void run() {
         // do html task
-        initSubWorkerHTMLTask(htmlSubWorkerModel).execute();
+        initSubWorkerHTMLTask(htmlSubWorker).execute();
 
         // repeat task
-        handler.postDelayed(this, htmlSubWorkerModel.interval);
+        handler.postDelayed(this, htmlSubWorker.htmlSubWorkerModel.interval);
       }
     };
   }
 
-  private AsyncTask<Void, Void, Void> initSubWorkerHTMLTask(final HTMLSubWorkerModel htmlSubWorkerModel) {
+  private AsyncTask<Void, Void, Void> initSubWorkerHTMLTask(final HTMLSubWorker htmlSubWorker) {
     return new AsyncTask<Void, Void, Void>() {
       @Override
       protected Void doInBackground(Void... params) {
         try {
+          HTMLSubWorkerModel htmlSubWorkerModel = htmlSubWorker.htmlSubWorkerModel;
+
           // get response
-          String response = getResponseFromHTMLCall(htmlSubWorkerModel);
+          String response = getResponseFromHTMLCall(htmlSubWorker);
 
           // get timestamp received
-          String timestamp = Long.toString(System.currentTimeMillis());
+          Long timestamp = System.currentTimeMillis();
 
           // check if json response
           JSONObject jo = new JSONObject();
@@ -136,13 +165,16 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
             response = jo.toString();
           }
 
+          // save timestamp
+          htmlSubWorker.notificationModel.lastPulled_epoch = timestamp;
+
           // add line as delimiter
           response += "\n";
 
           // create path to save (based on date)
           String fullPath = htmlSubWorkerModel.dataSaveDir + "/" +
               htmlSubWorkerModel.subWorkerName + "-" +
-              HTMLWorkerUtils.getCurrentDateInFormat("yyyy-MM-dd") + ".text";
+              HTMLWorkerUtils.getDateInFormat(new Date(), "yyyy-MM-dd") + ".text";
 
           // save response
           FileUtilsCustom.saveToFile(fullPath, response, true);
@@ -160,7 +192,9 @@ public class PlainHTMLWorker extends AbstractHTMLWorker {
     };
   }
 
-  private String getResponseFromHTMLCall(HTMLSubWorkerModel htmlSubWorkerModel) throws HTMLWorkerException {
+  private String getResponseFromHTMLCall(HTMLSubWorker htmlSubWorker) throws HTMLWorkerException {
+    HTMLSubWorkerModel htmlSubWorkerModel = htmlSubWorker.htmlSubWorkerModel;
+
     String response = "";
 
     try {

@@ -10,6 +10,7 @@ import com.nossbigg.htmlminder.exception.HTMLWorkerCallFailedException;
 import com.nossbigg.htmlminder.exception.HTMLWorkerException;
 import com.nossbigg.htmlminder.exception.HTMLWorkerNotOKException;
 import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
+import com.nossbigg.htmlminder.model.HTMLWorkerNotificationModel;
 import com.nossbigg.htmlminder.model.JSONResponseMetadataModel;
 import com.nossbigg.htmlminder.model.TweetHTMLWorkerModel;
 import com.nossbigg.htmlminder.utils.FileUtilsCustom;
@@ -17,18 +18,17 @@ import com.nossbigg.htmlminder.utils.GsonUtils;
 import com.nossbigg.htmlminder.utils.HTMLWorkerModelUtils;
 import com.nossbigg.htmlminder.utils.HTMLWorkerUtils;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -36,7 +36,7 @@ import javax.net.ssl.HttpsURLConnection;
 /**
  * Tweet HTML Worker
  * Note: Tweets are collected sequentially by worker order, and not in parallel.
- * <p/>
+ * <p>
  * Created by Gibson on 9/6/2016.
  */
 public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallbackHandler {
@@ -56,8 +56,7 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
   public long lastTweetIdPersistenceInterval = 5000;
 
   // LOOPING THREAD VARIABLES
-  private int subWorkerIteratorCurrentIndex = 0;
-  private int subWorkerSize = 0;
+  private Iterator<Map.Entry<String,HTMLSubWorker>> namesToWorkersMapIterator;
 
   // Handler and runnable for master loop
   public Handler masterWorkerHandler = new Handler();
@@ -66,8 +65,9 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
   public TweetHTMLWorker(TweetHTMLWorkerModel tweetHTMLWorkerModel) {
     super(tweetHTMLWorkerModel);
     workerModel = tweetHTMLWorkerModel;
-    masterWorkerRunnable = initMasterWorkerRunnable(masterWorkerHandler, workerModel);
     initWorkers();
+    masterWorkerRunnable = initMasterWorkerRunnable(masterWorkerHandler, namesToWorkersMap);
+    namesToWorkersMapIterator = namesToWorkersMap.entrySet().iterator();
 
     lastTweetIdPersistenceRunnable = initLastTweetIdPersistenceRunnable(
         lastTweetIdPersistenceHandler, workerNameToLastMaxIdTweetMap,
@@ -88,9 +88,6 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
   public void startWorkerAfterCallback() {
     if (!isProperConfig) return;
 
-    // reset iterator if not at first element
-    subWorkerIteratorCurrentIndex = 0;
-
     // start worker
     masterWorkerHandler.post(masterWorkerRunnable);
 
@@ -104,6 +101,27 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
     lastTweetIdPersistenceHandler.removeCallbacks(lastTweetIdPersistenceRunnable);
   }
 
+  @Override
+  public String getNotificationInfo() {
+    StringBuilder note = new StringBuilder();
+
+    for (Map.Entry<String, HTMLSubWorker> set : namesToWorkersMap.entrySet()) {
+      HTMLSubWorker subWorker = set.getValue();
+      HTMLWorkerNotificationModel notificationModel = subWorker.notificationModel;
+      note.append(subWorker.htmlSubWorkerModel.subWorkerName + ": ");
+      note.append(
+          // display none if null
+          (notificationModel.lastPulled_epoch != 0L) ?
+              HTMLWorkerUtils.convertEpochToDateFormat(
+                  notificationModel.lastPulled_epoch, "d/M/yyyy hh:mm:ss a") :
+              "None"
+      );
+      note.append("\n");
+    }
+
+    return note.toString();
+  }
+
   private void initWorkers() {
     // check if has workers
     if (workerModel.subWorkers.size() == 0) {
@@ -111,13 +129,26 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
       return;
     }
 
+    for (HTMLSubWorkerModel htmlSubWorkerModel : workerModel.subWorkers) {
+      // init htmlsubworker object
+      // htmlsubworker
+      HTMLSubWorker htmlSubWorker =
+          new HTMLSubWorker(htmlSubWorkerModel);
+
+      // skip subworker if essential fields are missing
+      if (HTMLWorkerUtils.isAnyFieldsEmpty(
+          htmlSubWorkerModel.subWorkerName, htmlSubWorkerModel.url
+          , htmlSubWorkerModel.method
+      )) continue;
+
+      // add to list of workers
+      namesToWorkersMap.put(htmlSubWorkerModel.subWorkerName, htmlSubWorker);
+    }
+
     // get and set frequency and random interval from first worker
     HTMLSubWorkerModel firstModel = workerModel.subWorkers.get(0);
     requestInterval = firstModel.interval;
     requestIntervalRandomVariance = firstModel.intervalRandomVariance;
-
-    // store number of subworkers
-    subWorkerSize = workerModel.subWorkers.size();
 
     // try load saved last max id tweets json file
     workerNameToLastMaxIdTweetMap =
@@ -127,8 +158,8 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
             ));
     // if returned nothing, make new list
     if (workerNameToLastMaxIdTweetMap.size() == 0) {
-      for (HTMLSubWorkerModel worker : workerModel.subWorkers) {
-        workerNameToLastMaxIdTweetMap.put(worker.subWorkerName, 0L);
+      for(String subWorkerName : namesToWorkersMap.keySet()){
+        workerNameToLastMaxIdTweetMap.put(subWorkerName, 0L);
       }
     }
   }
@@ -137,38 +168,45 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
    * Maintains launching of subworkers
    *
    * @param
+   * @param
    * @param handler
-   * @param workerModel
+   * @param namesToWorkersMap
    * @return
    */
   private Runnable initMasterWorkerRunnable(final Handler handler,
-                                            final TweetHTMLWorkerModel workerModel) {
+                                            final HashMap<String, HTMLSubWorker> namesToWorkersMap) {
     final TweetHTMLWorker that = this;
     return new Runnable() {
       @Override
       public void run() {
+        // reset iterator if at end
+        if(!namesToWorkersMapIterator.hasNext()){
+          namesToWorkersMapIterator = namesToWorkersMap.entrySet().iterator();
+        }
+
+        // get current HTMLWorker
+        HTMLSubWorker subWorker = namesToWorkersMapIterator.next().getValue();
+
         // do html task
-        initSubWorkerHTMLTask(workerModel.subWorkers.get(subWorkerIteratorCurrentIndex)).execute();
-
-        // increment index (with looparound)
-        subWorkerIteratorCurrentIndex = (subWorkerIteratorCurrentIndex + 1) % subWorkerSize;
-
+        initSubWorkerHTMLTask(subWorker).execute();
         // repeat task
         handler.postDelayed(this, requestInterval);
       }
     };
   }
 
-  private AsyncTask<Void, Void, Void> initSubWorkerHTMLTask(final HTMLSubWorkerModel htmlSubWorkerModel) {
+  private AsyncTask<Void, Void, Void> initSubWorkerHTMLTask(final HTMLSubWorker htmlSubWorker) {
     return new AsyncTask<Void, Void, Void>() {
       @Override
       protected Void doInBackground(Void... params) {
         try {
+          HTMLSubWorkerModel htmlSubWorkerModel = htmlSubWorker.htmlSubWorkerModel;
+
           // get response
           String response = getResponseFromHTMLCall(htmlSubWorkerModel);
 
           // get timestamp received
-          String timestamp = Long.toString(System.currentTimeMillis());
+          Long timestamp = System.currentTimeMillis();
 
           // check if json response
           JSONObject jo = new JSONObject();
@@ -210,13 +248,16 @@ public class TweetHTMLWorker extends AbstractHTMLWorker implements AsyncCallback
             response = jo.toString();
           }
 
+          // save timestamp
+          htmlSubWorker.notificationModel.lastPulled_epoch = timestamp;
+
           // add line as delimiter
           response += "\n";
 
           // create path to save (based on date)
           String fullPath = htmlSubWorkerModel.dataSaveDir + "/" +
               htmlSubWorkerModel.subWorkerName + "-" +
-              HTMLWorkerUtils.getCurrentDateInFormat("yyyy-MM-dd") + ".text";
+              HTMLWorkerUtils.getDateInFormat(new Date(), "yyyy-MM-dd")  + ".text";
 
           // save response
           FileUtilsCustom.saveToFile(fullPath, response, true);
