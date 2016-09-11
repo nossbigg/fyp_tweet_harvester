@@ -78,6 +78,7 @@ public class FileUtilsCustom {
     return true;
   }
 
+  // FIXME faulty method, fix if you want to use next time
   public static boolean makeZipFromFiles(String zipFilePath, String... sourcePaths) {
     // create zip file from sources
     // ref: https://www.mkyong.com/java/how-to-compress-files-in-zip-format/

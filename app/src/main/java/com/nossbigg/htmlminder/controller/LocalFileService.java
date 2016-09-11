@@ -105,19 +105,19 @@ public class LocalFileService implements Serializable {
           // if file is older than 1 day
           if (now.getTime() - f.lastModified() > TimeUnit.HOURS.toMillis(1)) {
             String filePath = f.getAbsolutePath();
-            String compressedFilePath = filePath + ".zip";
+            String compressedFilePath = filePath + ".gz";
 
             // skip files that have already been compressed
             if (new File(compressedFilePath).exists()) continue;
 
             // compress file
-            FileUtilsCustom.makeZipFromFiles(compressedFilePath, filePath);
+            FileUtilsCustom.makeGzipFromFile(compressedFilePath, filePath);
 
-            // delete file
-//            try {
-//              FileUtils.forceDelete(f);
-//            } catch (IOException e) {
-//            }
+            // delete source file
+            try {
+              FileUtils.forceDelete(f);
+            } catch (IOException e) {
+            }
           }
         }
 
