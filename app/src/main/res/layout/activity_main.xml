@@ -36,4 +36,13 @@
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"/>
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Worker Info"
+        android:id="@+id/htmlWorkerStatuses"
+        android:layout_below="@+id/stopServiceButton"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"/>
+
 </RelativeLayout>
