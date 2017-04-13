@@ -32,3 +32,15 @@ dependencies {
     // Apache Commons Lang3: StringUtils
     compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.0'
 }
+
+// create Mode JAR
+task deleteJar(type: Delete){
+    delete 'libs/HTMLMinderModels.jar'
+}
+task createJar(type: Copy){
+    from('build/intermediaries/bundles/release/')
+    into('libs/')
+    include('classes.jar')
+    rename('classes.jar','HTMLMinderModels.jar')
+}
+createJar.dependsOn(deleteJar,build)
