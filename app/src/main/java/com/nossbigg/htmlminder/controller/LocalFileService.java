@@ -8,7 +8,6 @@ import com.nossbigg.htmlminder.model.HTMLSubWorkerModel;
 import com.nossbigg.htmlminder.utils.FileUtilsCustom;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.time.DateUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Manages local storage structure
- * <p/>
+ * <p>
  * Created by Gibson on 9/8/2016.
  */
 public class LocalFileService implements Serializable {
@@ -102,12 +101,14 @@ public class LocalFileService implements Serializable {
         // compresses files
         Date now = new Date();
         for (File f : files) {
-          // if file is older than 1 day
-          if (now.getTime() - f.lastModified() > TimeUnit.HOURS.toMillis(1)) {
+          // FIXME compress files that were last modified yesterday or later
+          // if file was not modified today
+          if (!checkDateDMYSame(now, new Date(f.lastModified()))) {
             String filePath = f.getAbsolutePath();
             String compressedFilePath = filePath + ".gz";
 
             // skip files that have already been compressed
+            // prevents overwrite
             if (new File(compressedFilePath).exists()) continue;
 
             // compress file
@@ -135,6 +136,17 @@ public class LocalFileService implements Serializable {
         handler.postDelayed(this, interval);
       }
     };
+  }
+
+  private boolean checkDateDMYSame(Date a, Date b) {
+    Calendar aCal = Calendar.getInstance();
+    aCal.setTime(a);
+    Calendar bCal = Calendar.getInstance();
+    bCal.setTime(b);
+
+    return aCal.get(Calendar.DATE) == bCal.get(Calendar.DATE)
+        && aCal.get(Calendar.MONTH) == bCal.get(Calendar.MONTH)
+        && aCal.get(Calendar.YEAR) == bCal.get(Calendar.YEAR);
   }
 
   /**

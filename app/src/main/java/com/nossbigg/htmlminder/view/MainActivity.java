@@ -59,9 +59,12 @@ public class MainActivity extends AppCompatActivity {
       }
     });
 
+    // FIXME nullpointerexception when create again
     // update appDir label
     setDirDetailsLabel(activityBagModel.localFileService.appDir,
         activityBagModel.localFileService.appInitDir);
+
+    // TODO add label for detailed listing of current htmlworkers
 
     // close app by going to homescreen
 //    goToHome();
