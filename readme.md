@@ -5,7 +5,7 @@ Source code for tweet harvester for **A Study on Rumour Detection on Online Soci
 
 ## Key Features
 * Automated 24/7 tweet harvester
-* Live Worker Information via Notifications
+* Live Worker Information via Notifications  
 ![notifications](documentation/imgs/notifications.jpg "notifications")
 * JSON-based configuration for easy configuration of software
 * Collection and compilation of tweets into user-configurable folder names
